@@ -1,0 +1,25 @@
+{
+  "summary": "First-finish smoke test for Dona Lanche (venda de lanches sob encomenda). Backend endpoints (GET /api/products, POST /api/admin/login, POST /api/orders, PATCH /api/orders/{id}/status) all working. Full UI flow validated end-to-end: catalog loads 8 products, category filter works, add-to-cart updates counter & subtotal, 3-step checkout (customer info -> delivery date/time -> pix payment) completes and returns a #ENC-xxxx code, admin login rejects wrong password and accepts 'lanche123', Encomendas tab shows created orders, Cardápio tab exposes Novo Lanche. Payments are intentionally MOCKED (no gateway).",
+  "tested_scope": ["backend", "frontend", "integration", "auth"],
+  "passed": [
+    "GET /api/products returns 200 with 8 seeded products",
+    "POST /api/admin/login with wrong password returns 401",
+    "POST /api/admin/login with 'lanche123' returns 200 {ok:true}",
+    "POST /api/orders creates order with order_code ENC-xxxx (schema: customer_name, customer_phone, address, delivery_date, time_slot, payment_method, items[{product_id,name,price,quantity}])",
+    "PATCH /api/orders/{id}/status updates status to 'Preparando'",
+    "Store loads 8 product cards with image/name/price",
+    "Category filters (6 options) filter products correctly (3 cards for Salgados)",
+    "Add-to-cart increments nav-cart-count to 2; cart drawer shows subtotal R$ 97,80",
+    "3-step checkout flow completes: name/phone/address -> future-date calendar (16 enabled days) + time-slot-manha -> pix tab -> submit -> confirmation #ENC-5359",
+    "Admin login rejects wrong password (stays on login screen)",
+    "Admin login with lanche123 succeeds; Encomendas tab lists 2 ENC- codes; Cardápio tab shows Novo Lanche button and 8 products with Editar/Excluir"
+  ],
+  "failed": [],
+  "action_items": [
+    "Minor documentation nit: review request listed some testids that don't match code — actual ids are nav-cart-trigger (not nav-cart-button), cart-drawer-checkout-button (not cart-checkout-button), checkout-customer-address-input (not checkout-address-input). No code fix needed — tests work with actual ids. Consider aligning docs/testids for consistency."
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "mocked_apis_confirmed": ["Payment processing (Pix/credit/debit/vale) — fully simulated in frontend, no real gateway"]
+}
