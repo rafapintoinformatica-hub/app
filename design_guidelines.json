@@ -1,0 +1,197 @@
+{
+  "project_name": "Lanchonete Artesanal - Lanches Sob Encomenda",
+  "archetype": "Organic & Earthy Warm Gourmet (Artisanal Pre-Order)",
+  "language": "pt-BR",
+  "tech_stack": {
+    "framework": "React.js (JavaScript, .jsx files)",
+    "styling": "Tailwind CSS + Lucide Icons + Radix UI / Shadcn UI primitives",
+    "state": "React Hooks / Local Storage / Context API",
+    "motion": "Framer Motion",
+    "toast": "Sonner"
+  },
+  "typography": {
+    "font_family_heading": "Plus Jakarta Sans, sans-serif",
+    "font_family_body": "DM Sans, sans-serif",
+    "font_family_mono": "JetBrains Mono, monospace",
+    "rules": {
+      "h1": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-amber-950 dark:text-amber-50 leading-tight",
+      "h2": "text-2xl sm:text-3xl font-bold tracking-tight text-amber-950 dark:text-amber-100",
+      "h3": "text-xl sm:text-2xl font-semibold text-amber-900 dark:text-amber-200",
+      "subtitle": "text-base sm:text-lg text-amber-800/80 dark:text-amber-300/80 font-medium",
+      "body": "text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed",
+      "badge": "text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full",
+      "price": "font-black text-amber-600 dark:text-amber-400 font-mono"
+    }
+  },
+  "colors": {
+    "theme": "Warm Warm-Cream & Deep Terracotta / Dark Toast",
+    "base_light": {
+      "bg": "#FFFDF9",
+      "surface": "#FDF7EE",
+      "card": "#FFFFFF",
+      "border": "#F3E8D5",
+      "text_primary": "#2C1A0E",
+      "text_secondary": "#6E5544"
+    },
+    "brand_palette": {
+      "primary": "#D95D26",
+      "primary_hover": "#C04917",
+      "primary_light": "#FDEEE7",
+      "amber_accent": "#E69500",
+      "amber_light": "#FEF7E6",
+      "sage_fresh": "#2D6A4F",
+      "sage_light": "#EAF5F0",
+      "pix_teal": "#32BCAD",
+      "pix_teal_light": "#E6F8F6",
+      "card_gold": "#D4AF37"
+    },
+    "semantic": {
+      "success": "#2D6A4F",
+      "warning": "#E69500",
+      "error": "#E53E3E",
+      "info": "#2B6CB0"
+    }
+  },
+  "spacing_and_layout": {
+    "container_padding": "px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto",
+    "section_gap": "space-y-12 sm:space-y-16",
+    "grid_catalog": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
+    "hero_bento": "grid grid-cols-1 md:grid-cols-12 gap-6",
+    "card_padding": "p-5 sm:p-6"
+  },
+  "design_principles": [
+    "Fusion over Imitation: Mix warm artisanal bakery tones (warm cream, clay, deep terracotta) with high-speed modern e-commerce pre-order micro-interactions.",
+    "Scheduling First UX: The delivery date picker is an integrated hero banner and step 1 of checkout. Clear notice that items are baked/cooked fresh sob encomenda.",
+    "Contrast and Micro-Textures: Use subtle warm borders (1px border-amber-200/60), gentle shadows (shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300), and crisp badge indicators.",
+    "Accessibility & State Highlighting: Explicit hover/active text colors. Never use generic blue or raw black. Use warm dark chocolate (#2C1A0E) for high contrast text.",
+    "Zero Account Friction: Express checkout with full customer detail capture (name, phone, address) and simulated instant payment options."
+  ],
+  "key_user_flows": {
+    "pre_order_banner": {
+      "description": "Interactive date picker at top of catalog allowing customer to select target delivery date. Highlights lead-time (e.g. 'Pedindo hoje, entregamos a partir de amanhã')."
+    },
+    "catalog_and_filters": {
+      "categories": ["Todos", "Salgados & Coxinhas", "Hambúrgueres Artesanais", "Combos Sob Encomenda", "Doces & Sobremesas", "Bebidas Naturais"],
+      "search": "Instant text filter with badge highlights (Mais Pedidos, Novidade, Vegano)"
+    },
+    "product_modal": {
+      "features": "Photo gallery zoom, customizable options (molhos extras, observações, quantidade), minimum quantity notice for party combos."
+    },
+    "cart_drawer": {
+      "type": "Slide-over drawer on right (Sheet component)",
+      "contents": "Scheduled date summary banner, item list with quantity steppers (+/-), delivery address quick preview, promo voucher input, total breakdown, clear CTA button 'Avançar para Agendamento & Pagamento'."
+    },
+    "checkout_modal_or_page": {
+      "steps": [
+        "1. Dados da Entrega: Nome completo, Telefone (WhatsApp), Endereço completo (Rua, Número, Bairro, CEP, Complemento)",
+        "2. Agendamento da Entrega: Calendar component with valid future delivery dates and time slot choice (Manhã 09h-12h, Tarde 14h-18h, Noite 18h-21h)",
+        "3. Pagamento Simulado: Choice between Pix (QR Code + Copia e Cola), Cartão de Crédito (Form simulado), Cartão de Débito (Form simulado), Vale/Pluxee Refeição (Número do Cartão)"
+      ]
+    },
+    "order_confirmation": {
+      "features": "Animated checkmark, order code (ex: #ENC-9482), summary of scheduled date and time slot, simulated Pix copy button if Pix selected, simulated WhatsApp update link, button to view order status."
+    },
+    "admin_dashboard": {
+      "route": "Accessible via toggle or header button 'Painel Admin'",
+      "tabs": [
+        "Encomendas Agendadas (View incoming orders filtered by delivery date, update status: Pendente, Em Preparo, Pronto, Em Rota, Entregue)",
+        "Gerenciar Cardápio (Add, edit, delete snacks, toggle availability, edit price, upload image URL)"
+      ]
+    }
+  },
+  "payment_simulations": {
+    "pix": {
+      "name": "Pix (Aprovação Instantânea)",
+      "qr_code_demo": "Simulated SVG QR Code + 'Copia e Cola' key generator with one-click copy toast feedback."
+    },
+    "credit_card": {
+      "name": "Cartão de Crédito",
+      "fields": "Número do cartão, Nome no cartão, Validade (MM/AA), CVV, Parcelamento (1x sem juros)"
+    },
+    "debit_card": {
+      "name": "Cartão de Débito",
+      "fields": "Número do cartão, Nome no cartão, Validade (MM/AA), Banco emissor"
+    },
+    "meal_voucher": {
+      "name": "Vale / Pluxee Refeição (Sodexo, Alelo, VR, Pluxee)",
+      "fields": "Bandeira (Pluxee Refeição, Ticket Restaurante, Alelo Refeição, VR), Número do Cartão, Validade"
+    }
+  },
+  "image_urls": [
+    {
+      "category": "Salgados & Coxinhas",
+      "title": "Coxinha Gourmet de Frango com Catupiry",
+      "url": "https://images.pexels.com/photos/17409458/pexels-photo-17409458.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Coxinhas douradas crocantes servidas com molhos especiais."
+    },
+    {
+      "category": "Salgados & Coxinhas",
+      "title": "Cesta de Salgados Variados para Festas",
+      "url": "https://images.pexels.com/photos/36933440/pexels-photo-36933440.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Mini empanadas, salgadinhos e empadinhas sob encomenda."
+    },
+    {
+      "category": "Salgados & Coxinhas",
+      "title": "Bandeja de Mini Pão de Queijo Recheado",
+      "url": "https://images.unsplash.com/photo-1598142982901-df6cec10ae35?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwxfHxicmF6aWxpYW4lMjBzYWxnYWRvcyUyMGNveGluaGElMjBlbXBhZGF8ZW58MHx8fHwxNzkyMjQ1ODU4fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Pães de queijo artesanais quentinhos em cesta trançada."
+    },
+    {
+      "category": "Hambúrgueres Artesanais",
+      "title": "Burger Defumado Bacon & Cheddar",
+      "url": "https://images.pexels.com/photos/15010285/pexels-photo-15010285.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Hambúrguer artesanal 180g com cheddar cremoso e bacon fatiado."
+    },
+    {
+      "category": "Hambúrgueres Artesanais",
+      "title": "Combo Smash Burger Duplo + Rústicas",
+      "url": "https://images.unsplash.com/photo-1790010381859-d4916cdd34fd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHw0fHxnb3VybWV0JTIwYnVyZ2VyJTIwY2hlZXNlJTIwYmFjb258ZW58MHx8fHwxNzkyMjQ1ODU7fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Dois hambúrgueres smash, queijo prato e batatas rústicas com ervas."
+    },
+    {
+      "category": "Combos Sob Encomenda",
+      "title": "Kit Festa Gourmet (50 Salgados + 2 Burgers + 1 Sobremesa)",
+      "url": "https://images.pexels.com/photos/25860505/pexels-photo-25860505.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Combo completo para celebrações e reuniões agendadas."
+    },
+    {
+      "category": "Doces & Sobremesas",
+      "title": "Burger de Brigadeiro com Morango Artesanal",
+      "url": "https://images.pexels.com/photos/31450825/pexels-photo-31450825.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Brioche doce recheado com creme de avelã, brigadeiro gourmet e morangos frescos."
+    }
+  ],
+  "testing_and_data_attributes": {
+    "rule": "Every interactive input, button, select, tab, modal, and key text element MUST contain data-testid attribute in kebab-case format.",
+    "examples": [
+      "data-testid=\"nav-brand-logo\"",
+      "data-testid=\"nav-cart-trigger\"",
+      "data-testid=\"nav-admin-toggle\"",
+      "data-testid=\"delivery-date-picker\"",
+      "data-testid=\"category-filter-salgados\"",
+      "data-testid=\"snack-card-coxinha-gourmet\"",
+      "data-testid=\"snack-add-to-cart-button\"",
+      "data-testid=\"cart-drawer-checkout-button\"",
+      "data-testid=\"checkout-customer-name-input\"",
+      "data-testid=\"checkout-customer-phone-input\"",
+      "data-testid=\"checkout-customer-address-input\"",
+      "data-testid=\"checkout-delivery-date-calendar\"",
+      "data-testid=\"checkout-payment-pix-tab\"",
+      "data-testid=\"checkout-payment-card-tab\"",
+      "data-testid=\"checkout-payment-voucher-tab\"",
+      "data-testid=\"checkout-submit-order-button\"",
+      "data-testid=\"order-confirmation-code\"",
+      "data-testid=\"admin-orders-tab\"",
+      "data-testid=\"admin-add-snack-button\""
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Build the complete application in JavaScript (.js and .jsx files). Do not create TypeScript .tsx files unless explicitly configured.",
+    "Ensure all components use data-testid for all clickable and key content areas.",
+    "Implement Sonner toasts for cart additions, order submission, copying Pix key, and admin actions.",
+    "Use clean localStorage persistence for orders and cart so page reloads do not wipe data during testing or usage.",
+    "Make the delivery date picker prominent both on the catalog hero header (to set delivery expectation) and inside the checkout flow.",
+    "Admin panel must allow creating new items with image URL, price, category, description, and lead time.",
+    "Include sample seed data for at least 8 appetizing snacks so the store immediately looks populated and delicious."
+  ]
+}
