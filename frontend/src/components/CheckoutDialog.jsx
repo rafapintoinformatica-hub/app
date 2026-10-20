@@ -17,6 +17,7 @@ import {
   QrCode,
   Wallet,
   MessageCircle,
+  MapPin,
   CreditCard,
   Ticket,
   CalendarDays,
@@ -27,6 +28,8 @@ import { useStore } from "@/context/StoreContext";
 import { createOrder, validateCoupon, formatBRL, getSettings, waUrl } from "@/lib/api";
 import { toast } from "sonner";
 
+
+const DELIVERY_PLACES = ["Amil", "Green Park"];
 
 const PAYMENT_OPTIONS = [
   { id: "pix", label: "Pix", icon: QrCode },
@@ -45,9 +48,6 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
     customer_name: "",
     customer_phone: "",
     address: "",
-    neighborhood: "",
-    cep: "",
-    complement: "",
     notes: "",
   });
   const [date, setDate] = useState(null);
@@ -78,7 +78,7 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
     setCoupon(null);
     setCouponInput("");
     setPayment("pix");
-    setForm({ customer_name: "", customer_phone: "", address: "", neighborhood: "", cep: "", complement: "", notes: "" });
+    setForm({ customer_name: "", customer_phone: "", address: "", notes: "" });
   };
 
   const close = () => {
@@ -151,7 +151,7 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
       "",
       `Nome: ${o.customer_name}`,
       `Telefone: ${o.customer_phone}`,
-      `Endereço: ${o.address}${o.neighborhood ? `, ${o.neighborhood}` : ""}${o.complement ? ` - ${o.complement}` : ""}${o.cep ? ` - CEP ${o.cep}` : ""}`,
+      `Local de entrega: ${o.address}`,
       o.notes ? `Obs: ${o.notes}` : null,
     ].filter((l) => l !== null).join("\n");
   };
@@ -240,22 +240,22 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
                     <Input data-testid="checkout-customer-phone-input" value={form.customer_phone} onChange={update("customer_phone")} placeholder="(11) 99999-9999" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Endereço (Rua e Número)</Label>
-                    <Input data-testid="checkout-customer-address-input" value={form.address} onChange={update("address")} placeholder="Rua das Flores, 123" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label>Bairro</Label>
-                      <Input data-testid="checkout-neighborhood-input" value={form.neighborhood} onChange={update("neighborhood")} placeholder="Centro" />
+                    <Label className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> Local de entrega</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {DELIVERY_PLACES.map((place) => (
+                        <button
+                          key={place}
+                          type="button"
+                          data-testid={`checkout-place-${place.toLowerCase().replace(/\s+/g, "-")}`}
+                          onClick={() => setForm((f) => ({ ...f, address: place }))}
+                          className={`rounded-xl border p-4 text-center font-semibold text-sm text-amber-950 transition-colors ${
+                            form.address === place ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-amber-200/60 bg-white hover:border-primary/40"
+                          }`}
+                        >
+                          {place}
+                        </button>
+                      ))}
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>CEP</Label>
-                      <Input data-testid="checkout-cep-input" value={form.cep} onChange={update("cep")} placeholder="00000-000" />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Complemento (opcional)</Label>
-                    <Input data-testid="checkout-complement-input" value={form.complement} onChange={update("complement")} placeholder="Apto 42, bloco B" />
                   </div>
                 </div>
               )}

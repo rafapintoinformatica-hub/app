@@ -360,7 +360,7 @@ export default function Admin() {
                       </p>
                       <p className="flex items-start gap-2">
                         <MapPin className="h-4 w-4 text-amber-600 mt-0.5" />
-                        {o.address}{o.neighborhood ? `, ${o.neighborhood}` : ""}{o.complement ? ` — ${o.complement}` : ""}
+                        <span data-testid={`admin-order-place-${o.order_code}`}>{o.address}</span>
                       </p>
                     </div>
 
