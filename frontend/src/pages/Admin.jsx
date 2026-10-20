@@ -14,6 +14,7 @@ import {
   Ticket,
   MessageCircle,
   Settings as SettingsIcon,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { OrderPaymentEditor } from "@/components/OrderPaymentEditor";
+import { AdminReports } from "@/components/AdminReports";
 import {
   adminLogin,
   getProducts,
@@ -104,7 +107,7 @@ const chargeMessage = (o, pixKey) =>
     "",
     ...o.items.map((i) => `• ${i.quantity}x ${i.name}${i.flavor ? ` (${i.flavor})` : ""} - ${formatBRL(i.price * i.quantity)}`),
     "",
-    `Valor a pagar: ${formatBRL(o.total)}`,
+    `Valor a pagar: ${formatBRL(o.total)} (${o.payment_method})`,
     pixKey ? `Chave Pix: ${pixKey}` : null,
     "",
     "Assim que pagar, envie o comprovante por aqui. Obrigado!",
@@ -313,9 +316,12 @@ export default function Admin() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="orders">
-          <TabsList className="bg-amber-50 p-1">
+          <TabsList className="bg-amber-50 p-1 flex-wrap h-auto">
             <TabsTrigger value="orders" data-testid="admin-orders-tab" className="data-[state=active]:bg-white gap-2">
               <Package className="h-4 w-4" /> Encomendas ({orders.length})
+            </TabsTrigger>
+            <TabsTrigger value="reports" data-testid="admin-reports-tab" className="data-[state=active]:bg-white gap-2">
+              <BarChart3 className="h-4 w-4" /> Relatórios
             </TabsTrigger>
             <TabsTrigger value="menu" data-testid="admin-menu-tab" className="data-[state=active]:bg-white gap-2">
               <UtensilsCrossed className="h-4 w-4" /> Cardápio ({products.length})
@@ -360,7 +366,7 @@ export default function Admin() {
                       </p>
                       <p className="flex items-start gap-2">
                         <MapPin className="h-4 w-4 text-amber-600 mt-0.5" />
-                        <span data-testid={`admin-order-place-${o.order_code}`}>{o.address}</span>
+                        <span data-testid={`admin-order-place-${o.order_code}`}>{o.address}{o.complement ? ` — ${o.complement}` : ""}</span>
                       </p>
                     </div>
 
@@ -376,7 +382,7 @@ export default function Admin() {
 
                     <div className="flex items-center justify-between mt-4">
                       <div>
-                        <p className="text-xs text-zinc-500" data-testid={`admin-order-payment-${o.order_code}`}>{o.payment_method} · na entrega</p>
+                        <OrderPaymentEditor order={o} onUpdated={(u) => setOrders((prev) => prev.map((x) => (x.id === u.id ? u : x)))} />
                         <p className="font-mono font-black text-amber-950">{formatBRL(o.total)}</p>
                       </div>
                       <Select value={o.status} onValueChange={(v) => changeStatus(o.id, v)}>
@@ -459,6 +465,10 @@ export default function Admin() {
           </TabsContent>
 
           {/* Coupons */}
+          <TabsContent value="reports" className="mt-6">
+            <AdminReports orders={orders} />
+          </TabsContent>
+
           <TabsContent value="settings" className="mt-6">
             <div className="max-w-md bg-white rounded-2xl border border-amber-200/60 p-5 shadow-sm space-y-4">
               <h3 className="font-heading font-bold text-amber-950">WhatsApp & Pix</h3>

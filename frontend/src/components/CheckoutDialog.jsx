@@ -12,12 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
+import { Switch } from "@/components/ui/switch";
 import {
   CheckCircle2,
   QrCode,
   Wallet,
   MessageCircle,
   MapPin,
+  Banknote,
   CreditCard,
   Ticket,
   CalendarDays,
@@ -30,12 +32,17 @@ import { toast } from "sonner";
 
 
 const DELIVERY_PLACES = ["Amil", "Green Park"];
+const PLACE_FIELDS = {
+  Amil: [["Setor", "Ex: Financeiro, 3º andar"], ["Intervalo disponível", "Ex: 12h às 13h"]],
+  "Green Park": [["Bloco", "Ex: Bloco 4"], ["Apartamento", "Ex: 302"]],
+};
 
 const PAYMENT_OPTIONS = [
   { id: "pix", label: "Pix", icon: QrCode },
   { id: "credito", label: "Cartão de Crédito", icon: CreditCard },
   { id: "debito", label: "Cartão de Débito", icon: CreditCard },
   { id: "pluxee", label: "Pluxee Refeição", icon: Ticket },
+  { id: "dinheiro", label: "Dinheiro", icon: Banknote },
 ];
 
 export const CheckoutDialog = ({ open, onOpenChange }) => {
@@ -48,8 +55,12 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
     customer_name: "",
     customer_phone: "",
     address: "",
+    d1: "",
+    d2: "",
     notes: "",
   });
+  const [needChange, setNeedChange] = useState(false);
+  const [changeFor, setChangeFor] = useState("");
   const [date, setDate] = useState(null);
   const [payment, setPayment] = useState("pix");
   const [storePhone, setStorePhone] = useState("");
@@ -78,7 +89,9 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
     setCoupon(null);
     setCouponInput("");
     setPayment("pix");
-    setForm({ customer_name: "", customer_phone: "", address: "", notes: "" });
+    setForm({ customer_name: "", customer_phone: "", address: "", d1: "", d2: "", notes: "" });
+    setNeedChange(false);
+    setChangeFor("");
   };
 
   const close = () => {
@@ -89,7 +102,12 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
     }
   };
 
-  const validStep1 = form.customer_name && form.customer_phone && form.address;
+  const validStep1 = form.customer_name && form.customer_phone && form.address && form.d1.trim() && form.d2.trim();
+  const placeDetail = () => {
+    const [[l1], [l2]] = PLACE_FIELDS[form.address];
+    return `${l1}: ${form.d1.trim()} · ${l2}: ${form.d2.trim()}`;
+  };
+  const changeValue = parseFloat(String(changeFor).replace(",", "."));
 
   const applyCoupon = async () => {
     if (!couponInput.trim()) return;
@@ -116,7 +134,12 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
   };
 
   const buildPayload = () => ({
-    ...form,
+    customer_name: form.customer_name,
+    customer_phone: form.customer_phone,
+    address: form.address,
+    complement: placeDetail(),
+    notes: form.notes,
+    change_for: payment === "dinheiro" && needChange ? changeValue : null,
     delivery_date: date.toISOString().split("T")[0],
     items: cart.map((i) => ({ product_id: i.product_id, name: i.name, flavor: i.flavor || null, price: i.price, quantity: i.quantity })),
     payment_method: PAYMENT_OPTIONS.find((p) => p.id === payment).label,
@@ -125,6 +148,8 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
 
   const handleSubmit = async () => {
     if (!date) return toast.error("Escolha a data da entrega");
+    if (payment === "dinheiro" && needChange && !(changeValue >= total))
+      return toast.error("Informe um valor de troco maior ou igual ao total");
     setSubmitting(true);
     try {
       const order = await createOrder(buildPayload());
@@ -146,12 +171,12 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
       "",
       o.discount > 0 ? `Desconto (${o.coupon_code}): -${formatBRL(o.discount)}` : null,
       `Total: ${formatBRL(o.total)}`,
-      `Pagamento na entrega: ${o.payment_method}`,
+      `Pagamento na entrega: ${o.payment_method}${o.change_for ? ` (troco para ${formatBRL(o.change_for)})` : o.payment_method === "Dinheiro" ? " (sem troco)" : ""}`,
       `Entrega: ${new Date(o.delivery_date + "T00:00:00").toLocaleDateString("pt-BR")}`,
       "",
       `Nome: ${o.customer_name}`,
       `Telefone: ${o.customer_phone}`,
-      `Local de entrega: ${o.address}`,
+      `Local de entrega: ${o.address} - ${o.complement}`,
       o.notes ? `Obs: ${o.notes}` : null,
     ].filter((l) => l !== null).join("\n");
   };
@@ -247,7 +272,7 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
                           key={place}
                           type="button"
                           data-testid={`checkout-place-${place.toLowerCase().replace(/\s+/g, "-")}`}
-                          onClick={() => setForm((f) => ({ ...f, address: place }))}
+                          onClick={() => setForm((f) => (f.address === place ? f : { ...f, address: place, d1: "", d2: "" }))}
                           className={`rounded-xl border p-4 text-center font-semibold text-sm text-amber-950 transition-colors ${
                             form.address === place ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-amber-200/60 bg-white hover:border-primary/40"
                           }`}
@@ -257,6 +282,19 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
                       ))}
                     </div>
                   </div>
+                  {form.address && (
+                    <div className="grid grid-cols-2 gap-3 animate-float-up" data-testid="checkout-place-details">
+                      {PLACE_FIELDS[form.address].map(([label, ph], idx) => {
+                        const k = idx ? "d2" : "d1";
+                        return (
+                          <div key={label} className="space-y-1.5">
+                            <Label>{label}</Label>
+                            <Input data-testid={`checkout-place-detail-${idx + 1}`} value={form[k]} onChange={update(k)} placeholder={ph} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -326,6 +364,20 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
                         </button>
                       ))}
                     </div>
+                    {payment === "dinheiro" && (
+                      <div className="mt-3 bg-white rounded-xl border border-amber-200/60 p-3 space-y-3" data-testid="checkout-change-box">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="need-change">Precisa de troco?</Label>
+                          <Switch id="need-change" data-testid="checkout-need-change-switch" checked={needChange} onCheckedChange={setNeedChange} />
+                        </div>
+                        {needChange && (
+                          <div className="space-y-1.5">
+                            <Label>Troco para quanto? (R$)</Label>
+                            <Input data-testid="checkout-change-input" inputMode="decimal" value={changeFor} onChange={(e) => setChangeFor(e.target.value)} placeholder="Ex: 50,00" />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">

@@ -15,6 +15,8 @@ export const getOrders = () => api.get("/orders").then((r) => r.data);
 export const updateOrderStatus = (id, status) =>
   api.patch(`/orders/${id}/status`, { status }).then((r) => r.data);
 
+export const updateOrderPayment = (id, data) => api.patch(`/orders/${id}/payment`, data).then((r) => r.data);
+
 export const adminLogin = (password) => api.post("/admin/login", { password }).then((r) => r.data);
 
 export const getCoupons = () => api.get("/coupons").then((r) => r.data);

@@ -75,6 +75,7 @@ class OrderInput(BaseModel):
     time_slot: str = ""
     items: List[OrderItem]
     payment_method: str
+    change_for: Optional[float] = None
     notes: str = ""
     coupon_code: Optional[str] = None
 
@@ -92,6 +93,11 @@ class Order(OrderInput):
 
 class StatusUpdate(BaseModel):
     status: str
+
+
+class PaymentUpdate(BaseModel):
+    payment_method: str
+    change_for: Optional[float] = None
 
 
 class Settings(BaseModel):
@@ -350,6 +356,16 @@ async def update_order_status(order_id: str, data: StatusUpdate):
     update = {"status": data.status}
     if data.status in PAYMENT_BY_STATUS:
         update["payment_status"] = PAYMENT_BY_STATUS[data.status]
+    await db.orders.update_one({"id": order_id}, {"$set": update})
+    return {**existing, **update}
+
+
+@api_router.patch("/orders/{order_id}/payment", response_model=Order)
+async def update_order_payment(order_id: str, data: PaymentUpdate):
+    existing = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    update = data.model_dump()
     await db.orders.update_one({"id": order_id}, {"$set": update})
     return {**existing, **update}
 
