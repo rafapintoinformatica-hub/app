@@ -11,11 +11,11 @@ import { toast } from "sonner";
 
 const CATEGORIES = [
   "Todos",
-  "Salgados & Coxinhas",
-  "Hambúrgueres Artesanais",
-  "Combos Sob Encomenda",
-  "Doces & Sobremesas",
-  "Bebidas Naturais",
+  "Cucas",
+  "Bolos Caseiros",
+  "Bolos Recheados",
+  "Tortas Doces",
+  "Bebidas",
 ];
 
 export default function Store() {
@@ -56,20 +56,20 @@ export default function Store() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 grid lg:grid-cols-2 gap-10 items-center">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
             <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full bg-primary/10 text-primary">
-              <Sparkles className="h-3.5 w-3.5" /> Feito fresco sob encomenda
+              <Sparkles className="h-3.5 w-3.5" /> Cucas & bolos feitos sob encomenda
             </span>
             <h1 className="font-heading font-extrabold text-4xl sm:text-5xl lg:text-6xl tracking-tight text-amber-950 leading-[1.05] mt-4">
-              Lanches artesanais, <span className="text-primary">agendados</span> do seu jeito.
+              Cucas e bolos caseiros, <span className="text-primary">agendados</span> do seu jeito.
             </h1>
             <p className="text-base sm:text-lg text-amber-800/80 mt-4 max-w-lg">
-              Escolha seus favoritos, marque o dia da entrega e pague online por Pix, cartão ou vale-refeição. Tudo preparado na hora para você.
+              Escolha seus favoritos, marque o dia da entrega e pague na entrega com Pix, cartão de crédito, débito ou Pluxee Refeição. Tudo assado fresquinho para você.
             </p>
             <div className="flex flex-wrap gap-3 mt-7">
               <div className="flex items-center gap-2 text-sm text-amber-900 bg-white rounded-full px-4 py-2 border border-amber-200/60 shadow-sm">
                 <CalendarClock className="h-4 w-4 text-primary" /> Você escolhe o dia da entrega
               </div>
               <div className="flex items-center gap-2 text-sm text-amber-900 bg-white rounded-full px-4 py-2 border border-amber-200/60 shadow-sm">
-                <ChefHat className="h-4 w-4 text-primary" /> Pagamento online simples
+                <ChefHat className="h-4 w-4 text-primary" /> Pague só na entrega
               </div>
             </div>
           </motion.div>
@@ -80,8 +80,8 @@ export default function Store() {
             className="relative hidden lg:block"
           >
             <img
-              src="https://images.pexels.com/photos/15010285/pexels-photo-15010285.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
-              alt="Lanche artesanal"
+              src="https://images.pexels.com/photos/5121948/pexels-photo-5121948.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+              alt="Bolo caseiro artesanal"
               className="rounded-3xl shadow-2xl object-cover aspect-[4/3] w-full rotate-1"
             />
             <div className="absolute -bottom-5 -left-5 bg-white rounded-2xl shadow-xl p-4 border border-amber-200/60 rotate-[-3deg]">
@@ -105,7 +105,7 @@ export default function Store() {
               data-testid="catalog-search-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar lanches..."
+              placeholder="Buscar cucas e bolos..."
               className="pl-9 rounded-full bg-white border-amber-200/60"
             />
           </div>
@@ -135,7 +135,7 @@ export default function Store() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-zinc-500">Nenhum lanche encontrado.</div>
+          <div className="text-center py-20 text-zinc-500">Nenhum produto encontrado.</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filtered.map((p, i) => (
@@ -146,8 +146,8 @@ export default function Store() {
       </section>
 
       <footer className="border-t border-amber-200/60 py-8 text-center text-sm text-zinc-500">
-        <p className="font-heading font-bold text-amber-950">Dona Lanche — Sob Encomenda</p>
-        <p className="mt-1">Pedidos agendados · Pix, Cartão e Vale-Refeição</p>
+        <p className="font-heading font-bold text-amber-950">Deliciosas Cucas — Cucas & Bolos</p>
+        <p className="mt-1">Pedidos agendados · Pagamento na entrega: Pix, Crédito, Débito e Pluxee Refeição</p>
       </footer>
 
       <CartDrawer open={cartOpen} onOpenChange={setCartOpen} onCheckout={openCheckout} />

@@ -29,42 +29,43 @@ export const CartDrawer = ({ open, onOpenChange, onCheckout }) => {
                 <ShoppingBag className="h-7 w-7 text-amber-500" />
               </div>
               <p className="font-heading font-bold text-amber-950">Carrinho vazio</p>
-              <p className="text-sm text-zinc-500 mt-1">Adicione lanches deliciosos para começar.</p>
+              <p className="text-sm text-zinc-500 mt-1">Adicione cucas e bolos deliciosos para começar.</p>
             </div>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
             {cart.map((item) => (
               <div
-                key={item.product_id}
-                data-testid={`cart-item-${item.product_id}`}
+                key={item.key}
+                data-testid={`cart-item-${item.key}`}
                 className="flex gap-3 items-center bg-white rounded-xl border border-amber-200/60 p-3"
               >
                 <img src={item.image_url} alt={item.name} className="h-16 w-16 rounded-lg object-cover" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-amber-950 line-clamp-2">{item.name}</p>
+                  {item.flavor && <p className="text-xs text-amber-700" data-testid={`cart-flavor-${item.key}`}>Sabor: {item.flavor}</p>}
                   <p className="font-mono text-primary font-bold text-sm mt-0.5">{formatBRL(item.price)}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <button
-                    data-testid={`cart-remove-${item.product_id}`}
-                    onClick={() => removeFromCart(item.product_id)}
+                    data-testid={`cart-remove-${item.key}`}
+                    onClick={() => removeFromCart(item.key)}
                     className="text-zinc-400 hover:text-destructive transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                   <div className="flex items-center gap-1 bg-amber-50 rounded-full p-0.5">
                     <button
-                      data-testid={`cart-dec-${item.product_id}`}
-                      onClick={() => setQuantity(item.product_id, item.quantity - 1)}
+                      data-testid={`cart-dec-${item.key}`}
+                      onClick={() => setQuantity(item.key, item.quantity - 1)}
                       className="h-7 w-7 grid place-items-center rounded-full hover:bg-amber-200 text-amber-900"
                     >
                       <Minus className="h-3.5 w-3.5" />
                     </button>
                     <span className="w-6 text-center text-sm font-bold text-amber-950">{item.quantity}</span>
                     <button
-                      data-testid={`cart-inc-${item.product_id}`}
-                      onClick={() => setQuantity(item.product_id, item.quantity + 1)}
+                      data-testid={`cart-inc-${item.key}`}
+                      onClick={() => setQuantity(item.key, item.quantity + 1)}
                       className="h-7 w-7 grid place-items-center rounded-full hover:bg-amber-200 text-amber-900"
                     >
                       <Plus className="h-3.5 w-3.5" />
@@ -93,7 +94,7 @@ export const CartDrawer = ({ open, onOpenChange, onCheckout }) => {
               onClick={onCheckout}
               className="w-full h-12 rounded-xl bg-primary hover:bg-[#C04917] text-white font-bold text-base shadow-lg shadow-primary/20"
             >
-              Avançar para Agendamento & Pagamento
+              Avançar para Agendamento
             </Button>
           </SheetFooter>
         )}

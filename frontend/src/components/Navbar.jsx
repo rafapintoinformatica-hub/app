@@ -19,9 +19,9 @@ export const Navbar = ({ onCartClick }) => {
             <UtensilsCrossed className="h-5 w-5" />
           </div>
           <div className="text-left leading-tight">
-            <p className="font-heading font-extrabold text-lg text-amber-950">Dona Lanche</p>
+            <p className="font-heading font-extrabold text-lg text-amber-950">Deliciosas Cucas</p>
             <p className="text-[11px] uppercase tracking-widest text-amber-700/70 font-semibold -mt-0.5">
-              Sob Encomenda
+              Cucas & Bolos
             </p>
           </div>
         </button>

@@ -13,7 +13,7 @@ const load = (key, fallback) => {
 };
 
 export const StoreProvider = ({ children }) => {
-  const [cart, setCart] = useState(() => load("lanche_cart", []));
+  const [cart, setCart] = useState(() => load("lanche_cart", []).filter((i) => i.key));
   const [deliveryDate, setDeliveryDate] = useState(() => load("lanche_date", null));
 
   useEffect(() => {
@@ -23,28 +23,26 @@ export const StoreProvider = ({ children }) => {
     localStorage.setItem("lanche_date", JSON.stringify(deliveryDate));
   }, [deliveryDate]);
 
-  const addToCart = (product, quantity = 1) => {
+  const addToCart = (product, quantity = 1, flavor = null) => {
+    const key = `${product.id}|${flavor || ""}`;
     setCart((prev) => {
-      const found = prev.find((i) => i.product_id === product.id);
+      const found = prev.find((i) => i.key === key);
       if (found) {
-        return prev.map((i) =>
-          i.product_id === product.id ? { ...i, quantity: i.quantity + quantity } : i
-        );
+        return prev.map((i) => (i.key === key ? { ...i, quantity: i.quantity + quantity } : i));
       }
       return [
         ...prev,
-        { product_id: product.id, name: product.name, price: product.price, quantity, image_url: product.image_url },
+        { key, product_id: product.id, name: product.name, flavor, price: product.price, quantity, image_url: product.image_url },
       ];
     });
   };
 
-  const setQuantity = (productId, quantity) => {
-    if (quantity <= 0) return removeFromCart(productId);
-    setCart((prev) => prev.map((i) => (i.product_id === productId ? { ...i, quantity } : i)));
+  const setQuantity = (key, quantity) => {
+    if (quantity <= 0) return removeFromCart(key);
+    setCart((prev) => prev.map((i) => (i.key === key ? { ...i, quantity } : i)));
   };
 
-  const removeFromCart = (productId) =>
-    setCart((prev) => prev.filter((i) => i.product_id !== productId));
+  const removeFromCart = (key) => setCart((prev) => prev.filter((i) => i.key !== key));
 
   const clearCart = () => setCart([]);
 

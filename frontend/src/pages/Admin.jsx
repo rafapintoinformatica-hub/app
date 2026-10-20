@@ -11,6 +11,9 @@ import {
   CalendarDays,
   Phone,
   MapPin,
+  Ticket,
+  MessageCircle,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,25 +43,28 @@ import {
   deleteProduct,
   getOrders,
   updateOrderStatus,
+  getCoupons,
+  createCoupon,
+  deleteCoupon,
   formatBRL,
+  getSettings,
+  updateSettings,
+  waUrl,
 } from "@/lib/api";
 import { toast } from "sonner";
 
-const CATEGORIES = [
-  "Salgados & Coxinhas",
-  "Hambúrgueres Artesanais",
-  "Combos Sob Encomenda",
-  "Doces & Sobremesas",
-  "Bebidas Naturais",
-];
+const CATEGORIES = ["Cucas", "Bolos Caseiros", "Bolos Recheados", "Tortas Doces", "Bebidas"];
+const AWAITING = "Entregue - Aguardando Pagamento";
 
-const STATUSES = ["Pendente", "Em Preparo", "Pronto", "Em Rota", "Entregue"];
+const STATUSES = ["Pendente", "Em Preparo", "Pronto", "Em Rota", "Entregue e Pago", AWAITING];
 const STATUS_COLOR = {
   Pendente: "bg-amber-100 text-amber-800",
   "Em Preparo": "bg-blue-100 text-blue-800",
   Pronto: "bg-purple-100 text-purple-800",
   "Em Rota": "bg-orange-100 text-orange-800",
   Entregue: "bg-emerald-100 text-emerald-800",
+  "Entregue e Pago": "bg-emerald-100 text-emerald-800",
+  [AWAITING]: "bg-red-100 text-red-800",
 };
 
 const emptyForm = {
@@ -70,6 +76,44 @@ const emptyForm = {
   badge: "",
   lead_time_days: 1,
   available: true,
+  flavors: "",
+};
+
+const emptyCoupon = {
+  code: "",
+  discount_type: "percent",
+  discount_value: "",
+  max_uses: 1,
+  valid_until: "",
+  active: true,
+};
+
+const STATUS_MESSAGES = {
+  Pendente: "recebemos seu pedido e ele está confirmado",
+  "Em Preparo": "seu pedido já está sendo preparado com carinho",
+  Pronto: "seu pedido está pronto",
+  "Em Rota": "seu pedido saiu para entrega",
+  Entregue: "seu pedido foi entregue. Bom apetite!",
+  "Entregue e Pago": "seu pedido foi entregue e o pagamento confirmado. Obrigado e bom apetite!",
+};
+
+const chargeMessage = (o, pixKey) =>
+  [
+    `Olá ${o.customer_name}! Aqui é da Deliciosas Cucas.`,
+    `Seu pedido #${o.order_code} foi entregue. Segue a cobrança:`,
+    "",
+    ...o.items.map((i) => `• ${i.quantity}x ${i.name}${i.flavor ? ` (${i.flavor})` : ""} - ${formatBRL(i.price * i.quantity)}`),
+    "",
+    `Valor a pagar: ${formatBRL(o.total)}`,
+    pixKey ? `Chave Pix: ${pixKey}` : null,
+    "",
+    "Assim que pagar, envie o comprovante por aqui. Obrigado!",
+  ].filter((l) => l !== null).join("\n");
+
+const waLink = (o, pixKey) => {
+  if (o.status === AWAITING) return waUrl(o.customer_phone, chargeMessage(o, pixKey));
+  const msg = `Olá ${o.customer_name}! Aqui é da Deliciosas Cucas. Sobre seu pedido #${o.order_code} (entrega ${new Date(o.delivery_date + "T00:00:00").toLocaleDateString("pt-BR")} - ${o.time_slot}): ${STATUS_MESSAGES[o.status] || "atualização do seu pedido"}.`;
+  return waUrl(o.customer_phone, msg);
 };
 
 export default function Admin() {
@@ -85,9 +129,24 @@ export default function Admin() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
 
+  const [coupons, setCoupons] = useState([]);
+  const [couponForm, setCouponForm] = useState(emptyCoupon);
+  const [settings, setSettings] = useState({ store_whatsapp: "", pix_key: "" });
+
+  const saveSettings = async () => {
+    try {
+      setSettings(await updateSettings(settings));
+      toast.success("Configurações salvas");
+    } catch {
+      toast.error("Erro ao salvar configurações");
+    }
+  };
+
   const loadData = () => {
     getProducts().then(setProducts);
     getOrders().then(setOrders);
+    getCoupons().then(setCoupons);
+    getSettings().then(setSettings);
   };
 
   useEffect(() => {
@@ -116,7 +175,7 @@ export default function Admin() {
 
   const openEdit = (p) => {
     setEditing(p);
-    setForm({ ...p, badge: p.badge || "" });
+    setForm({ ...p, badge: p.badge || "", flavors: (p.flavors || []).join(", ") });
     setDialogOpen(true);
   };
 
@@ -127,6 +186,7 @@ export default function Admin() {
       price: parseFloat(form.price),
       lead_time_days: parseInt(form.lead_time_days) || 1,
       badge: form.badge || null,
+      flavors: form.flavors.split(",").map((f) => f.trim()).filter(Boolean),
     };
     try {
       if (editing) {
@@ -153,10 +213,41 @@ export default function Admin() {
     }
   };
 
-  const changeStatus = async (id, status) => {
+  const saveCoupon = async () => {
+    if (!couponForm.code || !couponForm.discount_value) return toast.error("Preencha código e valor");
     try {
-      await updateOrderStatus(id, status);
-      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+      await createCoupon({
+        code: couponForm.code,
+        discount_type: couponForm.discount_type,
+        discount_value: parseFloat(couponForm.discount_value),
+        max_uses: parseInt(couponForm.max_uses) || 1,
+        active: couponForm.active,
+        valid_until: couponForm.valid_until || null,
+      });
+      toast.success("Cupom criado");
+      setCouponForm(emptyCoupon);
+      loadData();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Erro ao criar cupom");
+    }
+  };
+
+  const removeCoupon = async (id) => {
+    try {
+      await deleteCoupon(id);
+      toast.success("Cupom removido");
+      loadData();
+    } catch {
+      toast.error("Erro ao remover cupom");
+    }
+  };
+
+  const changeStatus = async (id, status) => {
+    const order = orders.find((o) => o.id === id);
+    if (status === AWAITING) window.open(waUrl(order.customer_phone, chargeMessage(order, settings.pix_key)), "_blank");
+    try {
+      const updated = await updateOrderStatus(id, status);
+      setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
       toast.success("Status atualizado");
     } catch {
       toast.error("Erro ao atualizar status");
@@ -216,7 +307,7 @@ export default function Admin() {
             </Button>
             <h1 className="font-heading font-extrabold text-xl text-amber-950">Painel Admin</h1>
           </div>
-          <span className="text-sm text-zinc-500 hidden sm:block">Dona Lanche</span>
+          <span className="text-sm text-zinc-500 hidden sm:block">Deliciosas Cucas</span>
         </div>
       </header>
 
@@ -228,6 +319,12 @@ export default function Admin() {
             </TabsTrigger>
             <TabsTrigger value="menu" data-testid="admin-menu-tab" className="data-[state=active]:bg-white gap-2">
               <UtensilsCrossed className="h-4 w-4" /> Cardápio ({products.length})
+            </TabsTrigger>
+            <TabsTrigger value="coupons" data-testid="admin-coupons-tab" className="data-[state=active]:bg-white gap-2">
+              <Ticket className="h-4 w-4" /> Cupons ({coupons.length})
+            </TabsTrigger>
+            <TabsTrigger value="settings" data-testid="admin-settings-tab" className="data-[state=active]:bg-white gap-2">
+              <SettingsIcon className="h-4 w-4" /> Configurações
             </TabsTrigger>
           </TabsList>
 
@@ -270,7 +367,7 @@ export default function Admin() {
                     <div className="mt-3 border-t border-amber-100 pt-3 space-y-1">
                       {o.items.map((it, idx) => (
                         <div key={idx} className="flex justify-between text-sm">
-                          <span className="text-zinc-700">{it.quantity}× {it.name}</span>
+                          <span className="text-zinc-700">{it.quantity}× {it.name}{it.flavor ? ` — ${it.flavor}` : ""}</span>
                           <span className="font-mono text-zinc-500">{formatBRL(it.price * it.quantity)}</span>
                         </div>
                       ))}
@@ -279,11 +376,11 @@ export default function Admin() {
 
                     <div className="flex items-center justify-between mt-4">
                       <div>
-                        <p className="text-xs text-zinc-500">{o.payment_method}</p>
+                        <p className="text-xs text-zinc-500" data-testid={`admin-order-payment-${o.order_code}`}>{o.payment_method} · na entrega</p>
                         <p className="font-mono font-black text-amber-950">{formatBRL(o.total)}</p>
                       </div>
                       <Select value={o.status} onValueChange={(v) => changeStatus(o.id, v)}>
-                        <SelectTrigger className="w-36" data-testid={`admin-order-status-${o.order_code}`}>
+                        <SelectTrigger className="w-52" data-testid={`admin-order-status-${o.order_code}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -293,6 +390,15 @@ export default function Admin() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <a
+                      data-testid={`admin-whatsapp-${o.order_code}`}
+                      href={waLink(o, settings.pix_key)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 flex items-center justify-center gap-2 w-full rounded-lg bg-[#25D366] hover:bg-[#1da851] text-white font-semibold text-sm py-2 transition-colors"
+                    >
+                      <MessageCircle className="h-4 w-4" /> {o.status === AWAITING ? "Enviar cobrança no WhatsApp" : "Avisar cliente no WhatsApp"}
+                    </a>
                   </div>
                 ))}
               </div>
@@ -307,7 +413,7 @@ export default function Admin() {
                 onClick={openNew}
                 className="rounded-full bg-primary hover:bg-[#C04917] text-white"
               >
-                <Plus className="h-4 w-4 mr-2" /> Novo Lanche
+                <Plus className="h-4 w-4 mr-2" /> Novo Produto
               </Button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -351,6 +457,110 @@ export default function Admin() {
               ))}
             </div>
           </TabsContent>
+
+          {/* Coupons */}
+          <TabsContent value="settings" className="mt-6">
+            <div className="max-w-md bg-white rounded-2xl border border-amber-200/60 p-5 shadow-sm space-y-4">
+              <h3 className="font-heading font-bold text-amber-950">WhatsApp & Pix</h3>
+              <div className="space-y-1.5">
+                <Label>WhatsApp da loja (recebe os pedidos)</Label>
+                <Input data-testid="settings-whatsapp-input" value={settings.store_whatsapp} onChange={(e) => setSettings({ ...settings, store_whatsapp: e.target.value })} placeholder="5541999999999" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Chave Pix (enviada nas cobranças)</Label>
+                <Input data-testid="settings-pix-input" value={settings.pix_key} onChange={(e) => setSettings({ ...settings, pix_key: e.target.value })} placeholder="CPF, e-mail, telefone ou chave aleatória" />
+              </div>
+              <Button data-testid="settings-save-button" onClick={saveSettings} className="w-full rounded-lg bg-primary hover:bg-[#C04917] text-white">
+                Salvar
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="coupons" className="mt-6">
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-1 bg-white rounded-2xl border border-amber-200/60 p-5 shadow-sm h-fit">
+                <h3 className="font-heading font-bold text-amber-950 mb-4">Novo Cupom</h3>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Código</Label>
+                    <Input
+                      data-testid="coupon-form-code"
+                      value={couponForm.code}
+                      onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
+                      placeholder="EX: BOLO10"
+                      className="uppercase"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Tipo</Label>
+                      <Select value={couponForm.discount_type} onValueChange={(v) => setCouponForm({ ...couponForm, discount_type: v })}>
+                        <SelectTrigger data-testid="coupon-form-type"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percent">Porcentagem (%)</SelectItem>
+                          <SelectItem value="fixed">Valor fixo (R$)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>{couponForm.discount_type === "percent" ? "Desconto (%)" : "Desconto (R$)"}</Label>
+                      <Input data-testid="coupon-form-value" type="number" step="0.01" value={couponForm.discount_value} onChange={(e) => setCouponForm({ ...couponForm, discount_value: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Qtd. de usos</Label>
+                      <Input data-testid="coupon-form-maxuses" type="number" min="1" value={couponForm.max_uses} onChange={(e) => setCouponForm({ ...couponForm, max_uses: e.target.value })} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Válido até</Label>
+                      <Input data-testid="coupon-form-validuntil" type="date" value={couponForm.valid_until} onChange={(e) => setCouponForm({ ...couponForm, valid_until: e.target.value })} />
+                    </div>
+                  </div>
+                  <Button data-testid="coupon-form-save" onClick={saveCoupon} className="w-full rounded-lg bg-primary hover:bg-[#C04917] text-white">
+                    <Plus className="h-4 w-4 mr-1" /> Criar Cupom
+                  </Button>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2 space-y-3">
+                {coupons.length === 0 ? (
+                  <div className="text-center py-20 text-zinc-500">Nenhum cupom cadastrado.</div>
+                ) : (
+                  coupons.map((c) => (
+                    <div
+                      key={c.id}
+                      data-testid={`admin-coupon-${c.code}`}
+                      className="bg-white rounded-xl border border-amber-200/60 p-4 flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-primary">{c.code}</span>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                            {c.discount_type === "percent" ? `${c.discount_value}%` : formatBRL(c.discount_value)}
+                          </span>
+                          {!c.active && <span className="text-xs text-zinc-400">(inativo)</span>}
+                        </div>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          Usos: {c.used_count}/{c.max_uses}
+                          {c.valid_until ? ` · válido até ${new Date(c.valid_until + "T00:00:00").toLocaleDateString("pt-BR")}` : ""}
+                        </p>
+                      </div>
+                      <Button
+                        data-testid={`admin-coupon-delete-${c.code}`}
+                        onClick={() => removeCoupon(c.id)}
+                        size="sm"
+                        variant="outline"
+                        className="rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -359,7 +569,7 @@ export default function Admin() {
         <DialogContent className="max-w-md bg-[#FFFDF9] max-h-[90vh] overflow-y-auto" data-testid="admin-product-dialog">
           <DialogHeader>
             <DialogTitle className="font-heading text-amber-950">
-              {editing ? "Editar Lanche" : "Novo Lanche"}
+              {editing ? "Editar Lanche" : "Novo Produto"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
@@ -393,6 +603,10 @@ export default function Admin() {
             <div className="space-y-1.5">
               <Label>URL da Imagem</Label>
               <Input data-testid="admin-form-image" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sabores (separados por vírgula)</Label>
+              <Input data-testid="admin-form-flavors" value={form.flavors} onChange={(e) => setForm({ ...form, flavors: e.target.value })} placeholder="Ex: Banana, Uva, Coco" />
             </div>
             <div className="space-y-1.5">
               <Label>Selo (opcional)</Label>

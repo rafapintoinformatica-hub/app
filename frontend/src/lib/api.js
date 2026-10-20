@@ -17,5 +17,20 @@ export const updateOrderStatus = (id, status) =>
 
 export const adminLogin = (password) => api.post("/admin/login", { password }).then((r) => r.data);
 
+export const getCoupons = () => api.get("/coupons").then((r) => r.data);
+export const createCoupon = (data) => api.post("/coupons", data).then((r) => r.data);
+export const deleteCoupon = (id) => api.delete(`/coupons/${id}`).then((r) => r.data);
+export const validateCoupon = (code, subtotal) =>
+  api.post("/coupons/validate", { code, subtotal }).then((r) => r.data);
+
+export const getSettings = () => api.get("/settings").then((r) => r.data);
+export const updateSettings = (data) => api.put("/settings", data).then((r) => r.data);
+
+export const waUrl = (phone, text) => {
+  const digits = (phone || "").replace(/\D/g, "");
+  const full = digits.startsWith("55") ? digits : `55${digits}`;
+  return `https://wa.me/${full}?text=${encodeURIComponent(text)}`;
+};
+
 export const formatBRL = (v) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
