@@ -72,7 +72,7 @@ class OrderInput(BaseModel):
     cep: str = ""
     complement: str = ""
     delivery_date: str
-    time_slot: str
+    time_slot: str = ""
     items: List[OrderItem]
     payment_method: str
     notes: str = ""

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { ptBR } from "date-fns/locale";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,6 @@ import {
   CreditCard,
   Ticket,
   CalendarDays,
-  Clock,
   Tag,
   X,
 } from "lucide-react";
@@ -27,11 +27,6 @@ import { useStore } from "@/context/StoreContext";
 import { createOrder, validateCoupon, formatBRL, getSettings, waUrl } from "@/lib/api";
 import { toast } from "sonner";
 
-const TIME_SLOTS = [
-  { id: "manha", label: "Manhã", range: "09h - 12h" },
-  { id: "tarde", label: "Tarde", range: "14h - 18h" },
-  { id: "noite", label: "Noite", range: "18h - 21h" },
-];
 
 const PAYMENT_OPTIONS = [
   { id: "pix", label: "Pix", icon: QrCode },
@@ -56,7 +51,6 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
     notes: "",
   });
   const [date, setDate] = useState(null);
-  const [slot, setSlot] = useState("manha");
   const [payment, setPayment] = useState("pix");
   const [storePhone, setStorePhone] = useState("");
 
@@ -124,7 +118,6 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
   const buildPayload = () => ({
     ...form,
     delivery_date: date.toISOString().split("T")[0],
-    time_slot: TIME_SLOTS.find((s) => s.id === slot).label,
     items: cart.map((i) => ({ product_id: i.product_id, name: i.name, flavor: i.flavor || null, price: i.price, quantity: i.quantity })),
     payment_method: PAYMENT_OPTIONS.find((p) => p.id === payment).label,
     coupon_code: coupon?.code || null,
@@ -154,7 +147,7 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
       o.discount > 0 ? `Desconto (${o.coupon_code}): -${formatBRL(o.discount)}` : null,
       `Total: ${formatBRL(o.total)}`,
       `Pagamento na entrega: ${o.payment_method}`,
-      `Entrega: ${new Date(o.delivery_date + "T00:00:00").toLocaleDateString("pt-BR")} - ${o.time_slot}`,
+      `Entrega: ${new Date(o.delivery_date + "T00:00:00").toLocaleDateString("pt-BR")}`,
       "",
       `Nome: ${o.customer_name}`,
       `Telefone: ${o.customer_phone}`,
@@ -183,7 +176,7 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-zinc-500">Entrega</span>
                 <span className="font-semibold text-amber-950 text-sm">
-                  {new Date(confirmed.delivery_date + "T00:00:00").toLocaleDateString("pt-BR")} · {confirmed.time_slot}
+                  {new Date(confirmed.delivery_date + "T00:00:00").toLocaleDateString("pt-BR")}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -270,31 +263,13 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
               {step === 2 && (
                 <div className="space-y-4 animate-float-up">
                   <h3 className="font-heading font-bold text-amber-950 flex items-center gap-2">
-                    <CalendarDays className="h-4 w-4 text-primary" /> 2. Agendamento da Entrega
+                    <CalendarDays className="h-4 w-4 text-primary" /> 2. Dia da Entrega
                   </h3>
                   <p className="text-xs text-amber-800 bg-amber-50 rounded-lg px-3 py-2">
                     Cucas e bolos feitos sob encomenda. A entrega começa a partir de amanhã.
                   </p>
                   <div className="flex justify-center bg-white rounded-xl border border-amber-200/60 p-2" data-testid="checkout-delivery-date-calendar">
-                    <Calendar mode="single" selected={date} onSelect={setDate} disabled={(d) => d < tomorrow} className="rounded-md" />
-                  </div>
-                  <div>
-                    <Label className="flex items-center gap-1.5 mb-2"><Clock className="h-3.5 w-3.5" /> Faixa de horário</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {TIME_SLOTS.map((s) => (
-                        <button
-                          key={s.id}
-                          data-testid={`time-slot-${s.id}`}
-                          onClick={() => setSlot(s.id)}
-                          className={`rounded-xl border p-3 text-center transition-all ${
-                            slot === s.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-amber-200/60 bg-white hover:border-primary/40"
-                          }`}
-                        >
-                          <p className="font-semibold text-sm text-amber-950">{s.label}</p>
-                          <p className="text-[11px] text-zinc-500">{s.range}</p>
-                        </button>
-                      ))}
-                    </div>
+                    <Calendar locale={ptBR} mode="single" selected={date} onSelect={setDate} disabled={(d) => d < tomorrow} className="rounded-md" />
                   </div>
                 </div>
               )}

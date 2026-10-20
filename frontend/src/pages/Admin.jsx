@@ -112,7 +112,7 @@ const chargeMessage = (o, pixKey) =>
 
 const waLink = (o, pixKey) => {
   if (o.status === AWAITING) return waUrl(o.customer_phone, chargeMessage(o, pixKey));
-  const msg = `Olá ${o.customer_name}! Aqui é da Deliciosas Cucas. Sobre seu pedido #${o.order_code} (entrega ${new Date(o.delivery_date + "T00:00:00").toLocaleDateString("pt-BR")} - ${o.time_slot}): ${STATUS_MESSAGES[o.status] || "atualização do seu pedido"}.`;
+  const msg = `Olá ${o.customer_name}! Aqui é da Deliciosas Cucas. Sobre seu pedido #${o.order_code} (entrega ${new Date(o.delivery_date + "T00:00:00").toLocaleDateString("pt-BR")}): ${STATUS_MESSAGES[o.status] || "atualização do seu pedido"}.`;
   return waUrl(o.customer_phone, msg);
 };
 
@@ -353,7 +353,7 @@ export default function Admin() {
                     <div className="mt-3 space-y-1.5 text-sm text-zinc-600">
                       <p className="flex items-center gap-2">
                         <CalendarDays className="h-4 w-4 text-amber-600" />
-                        {new Date(o.delivery_date + "T00:00:00").toLocaleDateString("pt-BR")} · {o.time_slot}
+                        {new Date(o.delivery_date + "T00:00:00").toLocaleDateString("pt-BR")}
                       </p>
                       <p className="flex items-center gap-2">
                         <Phone className="h-4 w-4 text-amber-600" /> {o.customer_phone}
