@@ -1,33 +1,18 @@
-# PRD — Dona Lanche (Venda de Lanches Sob Encomenda)
+# Deliciosas Cucas — PRD
 
-## Problema original
-App de venda de lanches com pagamento online via Pix, cartão de crédito/débito e vale/Pluxee refeição. Itens com entrega agendada — o cliente escolhe o dia da entrega (venda sob encomenda).
+## Original problem
+App de venda sob encomenda (cucas e bolos) com entrega agendada. Cliente escolhe produto, sabor, quantidade, dia/horário da entrega e forma de pagamento (pago NA ENTREGA): Pix, Crédito, Débito ou Pluxee Refeição.
 
-## Escolhas do usuário
-- Pagamentos SIMULADOS (sem gateway real)
-- Sem login de cliente (checkout com nome, telefone, endereço)
-- Painel admin para gerenciar cardápio e pedidos
-- Agendamento: cliente escolhe apenas a DATA (+ faixa de horário)
-- Imagens bonitas de lanches, UI em pt-BR
+## Architecture
+FastAPI + MongoDB (backend/server.py), React (frontend/src). Admin password via ADMIN_PASSWORD (.env).
 
-## Arquitetura
-- Backend: FastAPI + MongoDB (motor). IDs uuid. Endpoints: /api/products (CRUD), /api/orders (POST/GET), /api/orders/{id}/status (PATCH), /api/admin/login (POST). Seed de 8 produtos no startup.
-- Frontend: React 19 + Vite + Tailwind v4 + shadcn/ui + framer-motion + sonner. Rotas: `/` (loja), `/admin`. Carrinho/data persistidos em localStorage via StoreContext.
-- Design: "Organic Warm Gourmet" — creme quente + terracota, fontes Plus Jakarta Sans / DM Sans / JetBrains Mono.
+## Implemented
+- Loja com categorias, busca, seleção de sabor + quantidade por produto, carrinho por sabor
+- Checkout 3 etapas: dados, agendamento (data a partir de amanhã + faixa horária), cupom + forma de pagamento na entrega
+- Confirmação com botão "Enviar pedido pelo WhatsApp" (wa.me para loja 5541989023769, configurável)
+- Admin: pedidos (status incl. "Entregue e Pago" e "Entregue - Aguardando Pagamento" → abre cobrança no WhatsApp do cliente com chave Pix), cardápio (sabores), cupons com limite de uso, Configurações (WhatsApp da loja + chave Pix)
+- Jun/2026: Stripe/pagamento online REMOVIDO; sabores, pagamento na entrega, cobrança via WhatsApp adicionados (iteration_2: 100%)
 
-## Implementado (2026-06)
-- Catálogo com 8 lanches, filtro por categoria e busca
-- Carrinho (drawer) com steppers +/- e remoção, subtotal
-- Checkout em 3 passos: dados de entrega → agendamento (calendário + horário) → pagamento (Pix/Crédito/Débito/Vale) → confirmação com código #ENC-xxxx
-- Painel admin protegido por senha (lanche123): aba Encomendas (ver pedidos + mudar status) e Cardápio (criar/editar/excluir lanches)
-- Testado end-to-end (iteration_1): 100% backend e frontend
-
-## Credenciais
-- Admin: senha `lanche123` (backend/.env ADMIN_PASSWORD)
-
-## Backlog (P1/P2)
-- Pagamento real (Stripe/Mercado Pago) quando o usuário quiser cobrar de verdade
-- Notificação WhatsApp automática de status do pedido
-- Cálculo de taxa de entrega por bairro/CEP
-- Cupons de desconto
-- Quantidade mínima para combos de festa
+## Backlog
+- P1: Usuário cadastrar chave Pix em Configurações
+- P2: Envio automático via WhatsApp API (Twilio), relatório financeiro de valores a receber

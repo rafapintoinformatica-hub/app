@@ -1,0 +1,44 @@
+{
+  "summary": "Full E2E test of Deliciosas Cucas pay-on-delivery flow. Backend: 15/15 pytest pass (products+flavors CRUD, orders with flavor -> payment_status 'A pagar na entrega', status->payment mapping Pago/Aguardando Pagamento, settings GET/PUT with digit normalization, coupon validate/apply/decrement/exhaustion, Stripe endpoints 404, admin login). Frontend: flavor select + error toast w/o flavor, qty stepper, separate cart lines per flavor ('Sabor: X'), cart inc/dec/remove, 3-step checkout, coupon (10% applied correctly), 4 payment options, no Stripe/payment API calls, confirmation shows '<method> (na entrega)', pay-on-delivery notice, wa.me/5541989023769 link with code/items+flavor/discount/total/address/notes; cart cleared on close. Admin: login (wrong pw rejected), orders show flavor, 6 statuses incl. new ones, 'Entregue - Aguardando Pagamento' calls window.open wa.me/55<customer phone> with charge msg incl. Pix key from settings, button text switches to 'Enviar cobrança no WhatsApp', 'Entregue e Pago' does not open WhatsApp and persists payment_status Pago; coupon creation & usage count; product form categories correct and flavors comma-split/trimmed/empty-filtered saved as list. All requested features work.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/orders", "issue": "Item prices/names are trusted from the client; totals are computed from client-sent price (price tampering possible). Flavor not validated against product flavors. Should look up product by product_id."},
+      {"endpoint": "Admin endpoints (POST/PUT/DELETE /api/products, /api/coupons, PATCH /api/orders/*, PUT /api/settings, GET /api/orders)", "issue": "No server-side auth; admin password is only checked client-side. GET /api/orders exposes customer PII publicly; anyone can change settings (e.g. store WhatsApp / Pix key)."},
+      {"endpoint": "PUT /api/settings", "issue": "Accepts empty store_whatsapp -> storefront link becomes https://wa.me/55?text=..."},
+      {"endpoint": "POST /api/orders", "issue": "order_code ENC-<4 random digits> without uniqueness check; coupon used_count increment not atomic (race can exceed max_uses)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Admin product dialog", "issue": "Edit title still says 'Editar Lanche' (old app wording) instead of 'Editar Produto'", "selector": "[data-testid='admin-product-dialog']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Checkout step 2 calendar", "issues": ["Calendar renders in English ('October 2026', Su/Mo/Tu) in a Portuguese app - pass ptBR locale from date-fns to Calendar"]},
+      {"screen": "Admin Cupons", "issues": ["'Válido até' uses native <input type=date> instead of shadcn Calendar/Popover"]},
+      {"screen": "Store/Admin product cards", "issues": ["Products created without image_url show broken image alt text - add placeholder fallback", "Torta de Limão image shows a berry/fruit tart, not a lemon meringue pie"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_cucas_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "(Recommended) Recompute item price/name server-side from products collection in POST /api/orders",
+    "(Recommended) Add server-side admin auth (token) for admin mutating endpoints and GET /api/orders",
+    "Rename 'Editar Lanche' to 'Editar Produto' in Admin.jsx",
+    "Use ptBR locale in checkout Calendar; replace native date input in coupon form with shadcn Calendar",
+    "Image fallback for products without image_url; validate non-empty store_whatsapp in settings"
+  ],
+  "critical_code_review_comments": [
+    "Admin.jsx is 631 lines - consider splitting into OrdersTab/MenuTab/CouponsTab/SettingsTab components",
+    "waUrl() treats any number starting with '55' as already having country code - a customer phone with DDD 55 (RS) typed without +55 (e.g. 55 99999-8888) would be sent to the wrong number",
+    "changeStatus opens WhatsApp before PATCH succeeds; if PATCH fails the charge message is still opened",
+    "CheckoutDialog delivery_date uses date.toISOString() - fine for UTC-3 but shifts a day in UTC+ timezones; prefer date-fns format(date,'yyyy-MM-dd')",
+    "No delete endpoint for orders; test orders (TEST_Cliente, TEST Maria) remain in DB"
+  ],
+  "updated_files": ["/app/backend/tests/test_cucas_api.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created test orders (customer TEST_Cliente / TEST Maria, cannot be deleted - no endpoint). Test products/coupons deleted. Settings restored to store_whatsapp=5541989023769, pix_key=''.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Product testids use slug of product name (e.g. snack-flavor-select-cuca-de-banana-com-farofa-doce, snack-flavor-option-<slug>-<flavorSlug>). Cart keys are '<productId>|<flavor>'. To capture admin window.open, inject override via page.add_script_tag after login (page.evaluate override did not persist). Run: REACT_APP_BACKEND_URL=... pytest /app/backend/tests/test_cucas_api.py"
+}
