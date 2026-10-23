@@ -456,12 +456,17 @@ export default function Admin() {
                       >
                         <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                       </Button>
-                      <Button
-                        data-testid={`admin-delete-${p.id}`}
-                        onClick={() => removeProduct(p.id)}
-                        size="sm"
-                        variant="outline"
-                        
+                      
+                        <Button
+  data-testid={`admin-delete-${p.id}`}
+  onClick={() => removeProduct(p.id)}
+  size="sm"
+  variant="outline"
+  className="rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10"
+>
+  <Trash2 className="h-3.5 w-3.5" />
+</Button>
+
 
                   <TabsTrigger key={v} value={v} data-testid={`settings-subtab-${v}`} className="data-[state=active]:bg-white">{l}</TabsTrigger>
                 ))}
