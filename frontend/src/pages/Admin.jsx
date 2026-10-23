@@ -486,7 +486,8 @@ export default function Admin() {
               </TabsList>
               <div className="mt-5 max-w-2xl">
                 <TabsContent value="loja"><StoreSettingsForm onSaved={setSettings} /></TabsContent>
-                {["statuses", "payment_methods", "places", "categories"].map((k) => (
+                {["statuses", "payment_methods", "places", "categories", "delivery_dates"].map((k) => (
+
                   <TabsContent key={k} value={k}><ConfigListEditor kind={k} /></TabsContent>
                 ))}
                 <TabsContent value="integracoes"><IntegrationsPanel /></TabsContent>
