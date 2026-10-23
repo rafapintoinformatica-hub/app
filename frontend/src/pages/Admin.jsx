@@ -461,26 +461,15 @@ export default function Admin() {
                         onClick={() => removeProduct(p.id)}
                         size="sm"
                         variant="outline"
-                        className="rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
+                        {["loja", "Loja"],
+  ["statuses", "Status"],
+  ["payment_methods", "Pagamentos"],
+  ["places", "Locais"],
+  ["categories", "Categorias"],
+  ["integracoes", "Integrações"],
+  ["avisos", "Notificações & Senha"],
+].map(([v, l]) => (
 
-          {/* Coupons */}
-          <TabsContent value="reports" className="mt-6">
-            <AdminReports orders={orders} />
-          </TabsContent>
-
-          <TabsContent value="settings" className="mt-6">
-            <Tabs defaultValue="loja">
-              <TabsList className="bg-amber-50 p-1 flex-wrap h-auto">
-                {[["loja", "Loja"], ["statuses", "Status"], ["payment_methods", "Pagamentos"], ["places", "Locais"], ["categories", "Categorias"], ["integracoes", "Integrações"], ["avisos", "Notificações & Senha"]] .map(([v, l]) => (
                   <TabsTrigger key={v} value={v} data-testid={`settings-subtab-${v}`} className="data-[state=active]:bg-white">{l}</TabsTrigger>
                 ))}
               </TabsList>
