@@ -34,6 +34,7 @@ export const StoreProvider = ({ children }) => {
   "categories",
 ];
 
+
     const [s, ...lists] = await Promise.all([getSettings(), ...kinds.map(getConfig)]);
     setSite(s);
     setConfig(Object.fromEntries(kinds.map((k, i) => [k, lists[i]])));
