@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 5: tested the InfinitePay/Pluxee integrations panel, Pluxee online checkout (fake creds), status justification, the auto-approved status logic (code review of mark_paid) and the InfinitePay refund flow, plus regression. Backend: 12/13 pytest pass. The one failure is a real problem in this DB: the owner already had a status named 'Cancelado' (red, position 6), so the startup seed skipped creating the is_cancel/requires_note status. No status in the DB has is_cancel=true, so the cancel-to-refund flow never fires with real data. To test the flow I created a TEST_Cancelado status (is_cancel + requires_note) and deleted it afterwards. With it, everything works. PATCH status returns 400 without a note, trims the note, appends status_history and clears status_note on the next status. A paid online order cancelled becomes 'Estorno pendente', then PATCH /refunded makes it 'Estornado'. Integrations: GET masks secrets as ••••xxxx; saving a masked or empty value keeps the old secret; an invalid env returns 400; the empty-creds test says 'Preencha todas as credenciais'; with fake creds the Pluxee UAT token call returns 401, the test shows a red 'Falha na autenticação Pluxee (401)' and nothing crashes. With Pluxee enabled and configured, pluxee_ready is true; pay with fake creds returns 402, the order stays 'Aguardando pagamento online' and no WhatsApp opens; retry reuses the same order (1 POST /orders, 2 pay calls). With Pluxee disabled, the option is hidden, POST /orders returns 400 and pay returns 400. UI: everything requested passed (integrations card, InfinitePay test green 'Link de pagamento gerado com sucesso', Pluxee form/env select/switch/save/test, checkout Pluxee option in the 'Pagar agora (online)' group, card form, 'Pagar R$ 15,00 com Pluxee', incomplete-card toast, status dialog with confirm disabled until a note is entered, 'Justificativa:' on the card, refund warning, refund dialog with the app.infinitepay.io link, 'Estorno pendente — fazer agora' button, 'Já fiz o estorno' giving 'Estornado', the 3 new status switches, the 'Online Pluxee Refeição' mode option, the Loja form without the InfiniteTag field, pay on delivery opening WhatsApp plus the confirmation, and the Pix Online redirect to checkout.infinitepay.io). Cleanup: all TEST_ orders and statuses deleted (8 real orders remain), pluxee_enabled=false, Pluxee creds removed, infinitepay_handle='rafael-gomes-23d', notification_email unchanged.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "startup_seed (statuses extras)", "issue": "The seed skips a status whenever a status with the same name exists. The owner's existing 'Cancelado' status has no is_cancel or requires_note, and no other status has is_cancel=true. In production, cancelling a paid online order will never set 'Estorno pendente', never open the refund dialog and never call the automatic Pluxee cancel, and no justification is required. Fix: migrate on startup. If no status has is_cancel=true and a status named 'Cancelado' exists, set is_cancel=true and requires_note=true on it with update_one. Or tell the owner to turn those switches on in Configurações → Status.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "PUT /api/admin/integrations", "issue": "Empty secrets are ignored, so Pluxee secrets (client_secret, sub keys) can never be cleared from the UI or API once saved. Consider a 'Limpar credenciais' action."},
+      {"endpoint": "PATCH /api/orders/{id}/refunded", "issue": "No check that payment_status is 'Estorno pendente'. Any order (even an unpaid pay-on-delivery one) can be marked 'Estornado'."},
+      {"endpoint": "PATCH /api/orders/{id}/status (marks_paid)", "issue": "A marks_paid status applied after a refund sets an 'Estornado' order back to 'Pago'."},
+      {"endpoint": "POST /api/payments/pluxee/pay", "issue": "A failed Pluxee attempt leaves an orphan order in 'Aguardando pagamento online' (initial status) if the customer gives up. It shows in the admin list and reports. Consider labelling or filtering these orders."},
+      {"endpoint": "_mask", "issue": "Secrets of 4 characters or fewer are returned in full inside the mask."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OrderPaymentEditor", "issue": "Online orders (Pix Online / Pluxee Refeição Online, paid or refunded) are still labelled 'Pix Online · na entrega' on the admin order card. The label should depend on payment_mode.", "selector": "[data-testid^='admin-order-payment-']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration5_integrations.py", "/app/backend/tests/iter5_ui_seed.py", "/app/test_reports/pytest/pytest_iter5.xml"],
+  "action_items": [
+    "HIGH: add a startup migration so an existing 'Cancelado' status gets is_cancel=true and requires_note=true when no is_cancel status exists. Without it the refund and justification flow is inactive in the real DB.",
+    "Change the admin order card payment label: show 'online' instead of 'na entrega' for payment_mode online/pluxee.",
+    "Optional: guard /refunded so it only works for 'Estorno pendente' orders; stop marks_paid from overriding 'Estornado'; add a way to clear Pluxee credentials."
+  ],
+  "critical_code_review_comments": [
+    "mark_paid is atomic (filter payment_status != 'Pago'), sets the auto_on_online_paid status, pushes status_history and notifies only on the first transition. It is called by the InfinitePay confirm and webhook paths and by Pluxee pay. Looks correct.",
+    "startup seed matches on name, so a pre-existing status with the same name blocks the flags (root cause of the HIGH issue).",
+    "update_order_status: if Pluxee cancel fails it returns 502 and the status is not changed, which is good. Pluxee orders with no pluxee_transaction_id fall back to 'Estorno pendente' and show the InfinitePay refund instructions, which are wrong for Pluxee.",
+    "Pluxee merchant orderNumber is a timestamp, not linked to the order id/code, so reconciling with the Pluxee statement will be hard. Consider order_code plus a suffix.",
+    "CheckoutDialog opens window.open('') before the Pluxee pay call. On failure it is closed correctly (no popup was left open in the tests)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration5_integrations.py", "/app/backend/tests/iter5_ui_seed.py"],
+  "success_rate": {"backend": "92% (12/13)", "frontend": "100% of requested flows (one LOW label bug)"},
+  "seed_data_creation": "Temporary only: TEST_ orders, a TEST_Cancelado status and fake TEST_ Pluxee creds. All removed. pluxee_last_test was restored to its previous value.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Real-owner DB: 8 real orders. Run: REACT_APP_BACKEND_URL=<url> pytest /app/backend/tests/test_iteration5_integrations.py (it cleans up after itself via pymongo). For UI refund tests run 'python /app/backend/tests/iter5_ui_seed.py seed' (creates TEST_Cancelado, a paid Pix Online TEST order and a Dinheiro TEST order), then 'cleanup'. After the main agent's migration fix, test_seeded_statuses should pass and the real 'Cancelado' status should carry is_cancel and requires_note. The Pluxee UAT token endpoint returns 401 for fake creds, which is expected.",
+  "rca of the issue": "Startup extras loop: `if not await db[kind].find_one(query) and not await db[kind].find_one({'name': item['name']})`. The owner's DB already had {'name':'Cancelado','color':'red'} without the new flags, so the second condition skipped the insert and left no is_cancel status. Reproduce: GET /api/config/statuses shows 'Cancelado' without is_cancel or requires_note. Fix: when a same-name status exists and no status matches the query, $set the flags on it."
+}
