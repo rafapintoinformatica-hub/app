@@ -21,8 +21,7 @@ export const StoreProvider = ({ children }) => {
   statuses: [],
   payment_methods: [],
   places: [],
-  categories: [],
-  delivery_dates: [],
+  categories: []
 });
 
 
