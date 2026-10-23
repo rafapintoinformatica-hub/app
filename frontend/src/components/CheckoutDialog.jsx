@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { useStore } from "@/context/StoreContext";
-import { createOrder, formatBRL, waUrl } from "@/lib/api";
+import { createOrder, formatBRL, waUrl, pluxeePay } from "@/lib/api";
+import { emptyCard, cardValid } from "@/components/checkout/PluxeeCardForm";
 import { orderMessage } from "@/lib/messages";
 import { StepCustomer } from "@/components/checkout/StepCustomer";
 import { StepPayment } from "@/components/checkout/StepPayment";
@@ -17,7 +18,7 @@ export const PENDING_ORDER_KEY = "pending_online_order";
 
 export const CheckoutDialog = ({ open, onOpenChange }) => {
   const { cart, subtotal, clearCart, site, config } = useStore();
-  const methods = config.payment_methods.filter((m) => m.active);
+  const methods = config.payment_methods.filter((m) => m.active && (m.mode !== "pluxee" || site?.pluxee_ready));
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(null);
@@ -28,6 +29,8 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
   const [coupon, setCoupon] = useState(null);
   const [change, setChange] = useState({ need: false, value: "" });
   const [notes, setNotes] = useState("");
+  const [card, setCard] = useState(emptyCard);
+  const [pluxeeOrder, setPluxeeOrder] = useState(null);
 
   useEffect(() => {
     if (!payment && methods.length) setPayment(methods[0].name);
@@ -56,6 +59,8 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
     setChange({ need: false, value: "" });
     setNotes("");
     setForm(emptyForm);
+    setCard(emptyCard);
+    setPluxeeOrder(null);
   };
 
   const close = () => {
@@ -86,11 +91,18 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
     if (!method) return toast.error("Escolha a forma de pagamento");
     if (method.allows_change && change.need && !(changeValue >= total))
       return toast.error("Informe um valor de troco maior ou igual ao total");
+    const isPluxee = method.mode === "pluxee";
+    if (isPluxee && !cardValid(card)) return toast.error("Preencha todos os dados do cartão Pluxee e o CPF");
     setSubmitting(true);
     const online = method.mode === "online";
     const win = online ? null : window.open("", "_blank");
     try {
-      const order = await createOrder(buildPayload());
+      let order = pluxeeOrder && isPluxee ? pluxeeOrder : await createOrder(buildPayload());
+      if (isPluxee) {
+        setPluxeeOrder(order);
+        order = await pluxeePay({ order_id: order.id, ...card });
+        setCard(emptyCard);
+      }
       if (online) {
         localStorage.setItem(PENDING_ORDER_KEY, order.id);
         window.location.href = order.checkout_url;
@@ -138,7 +150,7 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
               )}
               {step === 3 && (
                 <StepPayment methods={methods} payment={payment} setPayment={setPayment} subtotal={subtotal} coupon={coupon} setCoupon={setCoupon}
-                  change={change} setChange={setChange} notes={notes} setNotes={setNotes} />
+                  change={change} setChange={setChange} notes={notes} setNotes={setNotes} card={card} setCard={setCard} />
               )}
             </div>
 
@@ -160,7 +172,7 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
                     className="flex-1 rounded-xl bg-primary hover:bg-[#C04917] text-white font-bold">Continuar</Button>
                 ) : (
                   <Button data-testid="checkout-submit-order-button" onClick={handleSubmit} disabled={submitting} className="flex-1 rounded-xl bg-primary hover:bg-[#C04917] text-white font-bold">
-                    {submitting ? "Enviando..." : method?.mode === "online" ? "Ir para pagamento" : "Confirmar Encomenda"}
+                    {submitting ? "Enviando..." : method?.mode === "online" ? "Ir para pagamento" : method?.mode === "pluxee" ? `Pagar ${formatBRL(total)} com Pluxee` : "Confirmar Encomenda"}
                   </Button>
                 )}
               </div>

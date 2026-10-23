@@ -21,8 +21,14 @@ export const deleteProduct = (id) => api.delete(`/products/${id}`).then((r) => r
 
 export const createOrder = (data) => api.post("/orders", data).then((r) => r.data);
 export const getOrders = () => api.get("/orders").then((r) => r.data);
-export const updateOrderStatus = (id, status) =>
-  api.patch(`/orders/${id}/status`, { status }).then((r) => r.data);
+export const updateOrderStatus = (id, status, note = "") =>
+  api.patch(`/orders/${id}/status`, { status, note }).then((r) => r.data);
+export const markRefunded = (id) => api.patch(`/orders/${id}/refunded`).then((r) => r.data);
+export const getIntegrations = () => api.get("/admin/integrations").then((r) => r.data);
+export const updateIntegrations = (data) => api.put("/admin/integrations", data).then((r) => r.data);
+export const testInfinitePay = () => api.post("/admin/integrations/infinitepay/test").then((r) => r.data);
+export const testPluxee = () => api.post("/admin/integrations/pluxee/test").then((r) => r.data);
+export const pluxeePay = (data) => api.post("/payments/pluxee/pay", data).then((r) => r.data);
 
 export const updateOrderPayment = (id, data) => api.patch(`/orders/${id}/payment`, data).then((r) => r.data);
 

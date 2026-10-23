@@ -14,26 +14,30 @@ import { toast } from "sonner";
 const SCHEMAS = {
   statuses: {
     title: "Status dos pedidos",
-    empty: { name: "", color: "amber", is_initial: false, marks_paid: false, sends_charge: false },
+    empty: { name: "", color: "amber", is_initial: false, marks_paid: false, sends_charge: false, auto_on_online_paid: false, is_cancel: false, requires_note: false },
     fields: [
       { key: "name", label: "Nome do status", type: "text" },
       { key: "color", label: "Cor", type: "select", options: Object.entries(COLOR_NAMES) },
       { key: "is_initial", label: "Status inicial de todo pedido novo", type: "switch" },
       { key: "marks_paid", label: "Marca o pedido como PAGO", type: "switch" },
       { key: "sends_charge", label: "Envia cobrança no WhatsApp do cliente", type: "switch" },
+      { key: "auto_on_online_paid", label: "Aplicado automaticamente quando o pagamento online é aprovado", type: "switch" },
+      { key: "is_cancel", label: "É cancelamento (pedidos pagos online vão para estorno)", type: "switch" },
+      { key: "requires_note", label: "Exige justificativa ao aplicar", type: "switch" },
     ],
-    tags: (i) => [i.is_initial && "Inicial", i.marks_paid && "Marca pago", i.sends_charge && "Envia cobrança"],
+    tags: (i) => [i.is_initial && "Inicial", i.marks_paid && "Marca pago", i.sends_charge && "Envia cobrança",
+      i.auto_on_online_paid && "Auto ao aprovar online", i.is_cancel && "Cancelamento/estorno", i.requires_note && "Exige justificativa"],
   },
   payment_methods: {
     title: "Formas de pagamento",
     empty: { name: "", mode: "entrega", allows_change: false, active: true },
     fields: [
       { key: "name", label: "Nome", type: "text" },
-      { key: "mode", label: "Tipo", type: "select", options: [["entrega", "Pago na entrega"], ["online", "Online (InfinitePay: Pix e cartão)"]] },
+      { key: "mode", label: "Tipo", type: "select", options: [["entrega", "Pago na entrega"], ["online", "Online (InfinitePay: Pix e cartão)"], ["pluxee", "Online Pluxee Refeição (cartão no site)"]] },
       { key: "allows_change", label: "Pergunta se precisa de troco (dinheiro)", type: "switch" },
       { key: "active", label: "Ativo na loja", type: "switch" },
     ],
-    tags: (i) => [i.mode === "online" ? "Online" : "Na entrega", i.allows_change && "Troco", !i.active && "Inativo"],
+    tags: (i) => [{ online: "Online InfinitePay", pluxee: "Online Pluxee" }[i.mode] || "Na entrega", i.allows_change && "Troco", !i.active && "Inativo"],
   },
   places: {
     title: "Locais de entrega",

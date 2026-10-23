@@ -22,7 +22,6 @@ const GROUPS = [
   ["Contato, pagamentos e avisos", [
     ["store_whatsapp", "WhatsApp da loja (recebe os pedidos)"],
     ["pix_key", "Chave Pix (enviada nas cobranças)"],
-    ["infinitepay_handle", "InfiniteTag da InfinitePay (pagamento online)"],
     ["notification_email", "E-mail que recebe aviso de pagamento aprovado"],
   ]],
 ];

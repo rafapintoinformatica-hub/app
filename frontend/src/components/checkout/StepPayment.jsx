@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { validateCoupon, formatBRL } from "@/lib/api";
 import { toast } from "sonner";
+import { PluxeeCardForm } from "@/components/checkout/PluxeeCardForm";
 
 const slug = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-");
 
@@ -73,7 +74,7 @@ const MethodGroup = ({ title, icon: Icon, methods, payment, setPayment }) =>
     </div>
   );
 
-export const StepPayment = ({ methods, payment, setPayment, subtotal, coupon, setCoupon, change, setChange, notes, setNotes }) => {
+export const StepPayment = ({ methods, payment, setPayment, subtotal, coupon, setCoupon, change, setChange, notes, setNotes, card, setCard }) => {
   const selected = methods.find((m) => m.name === payment);
   return (
     <div className="space-y-4 animate-float-up">
@@ -81,13 +82,14 @@ export const StepPayment = ({ methods, payment, setPayment, subtotal, coupon, se
       <CouponBox subtotal={subtotal} coupon={coupon} setCoupon={setCoupon} />
       <div className="space-y-4">
         <Label className="flex items-center gap-1.5 text-amber-900"><Wallet className="h-3.5 w-3.5" /> Forma de pagamento</Label>
-        <MethodGroup title="Pagar agora (online)" icon={Globe} methods={methods.filter((m) => m.mode === "online")} payment={payment} setPayment={setPayment} />
-        <MethodGroup title="Pagar na entrega" icon={Truck} methods={methods.filter((m) => m.mode !== "online")} payment={payment} setPayment={setPayment} />
+        <MethodGroup title="Pagar agora (online)" icon={Globe} methods={methods.filter((m) => m.mode === "online" || m.mode === "pluxee")} payment={payment} setPayment={setPayment} />
+        <MethodGroup title="Pagar na entrega" icon={Truck} methods={methods.filter((m) => m.mode === "entrega")} payment={payment} setPayment={setPayment} />
         {selected?.mode === "online" && (
           <p className="text-xs text-zinc-600 bg-amber-50 rounded-lg px-3 py-2" data-testid="online-payment-notice">
             Você será levado ao checkout seguro da InfinitePay (Pix ou cartão). Depois de pagar, volte para enviar o pedido no WhatsApp.
           </p>
         )}
+        {selected?.mode === "pluxee" && <PluxeeCardForm card={card} setCard={setCard} />}
         {selected?.allows_change && (
           <div className="bg-white rounded-xl border border-amber-200/60 p-3 space-y-3" data-testid="checkout-change-box">
             <div className="flex items-center justify-between">

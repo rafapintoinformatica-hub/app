@@ -19,6 +19,7 @@ from datetime import datetime, timezone, timedelta
 
 import notify
 import infinitepay
+import pluxee
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -134,11 +135,36 @@ class Order(OrderInput):
     checkout_url: Optional[str] = None
     receipt_url: Optional[str] = None
     transaction_nsu: Optional[str] = None
+    pluxee_transaction_id: Optional[str] = None
+    status_note: str = ""
+    status_history: List[dict] = []
     created_at: str = Field(default_factory=now_iso)
 
 
 class StatusUpdate(BaseModel):
     status: str
+    note: str = ""
+
+
+class IntegrationsUpdate(BaseModel):
+    infinitepay_handle: Optional[str] = None
+    pluxee_enabled: Optional[bool] = None
+    pluxee_env: Optional[str] = None
+    pluxee_client_id: Optional[str] = None
+    pluxee_client_secret: Optional[str] = None
+    pluxee_mid: Optional[str] = None
+    pluxee_sub_key_cards: Optional[str] = None
+    pluxee_sub_key_transaction: Optional[str] = None
+
+
+class PluxeePay(BaseModel):
+    order_id: str
+    card_number: str
+    owner_name: str
+    expiry_month: str
+    expiry_year: str
+    cvv: str
+    cpf: str
 
 
 class PaymentUpdate(BaseModel):
@@ -207,11 +233,14 @@ class StatusItem(BaseModel):
     is_initial: bool = False
     marks_paid: bool = False
     sends_charge: bool = False
+    auto_on_online_paid: bool = False
+    is_cancel: bool = False
+    requires_note: bool = False
 
 
 class PaymentMethodItem(BaseModel):
     name: str
-    mode: str = "entrega"  # "entrega" | "online"
+    mode: str = "entrega"  # "entrega" | "online" (InfinitePay) | "pluxee"
     allows_change: bool = False
     active: bool = True
     position: int = 0
@@ -353,6 +382,13 @@ async def startup_seed():
             docs = [{**CONFIG_MODELS[kind](**{**it, "position": i}).model_dump(), "id": new_id()}
                     for i, it in enumerate(items)]
             await db[kind].insert_many(docs)
+    extras = [("statuses", {"auto_on_online_paid": True}, {"name": "Pagamento Aprovado", "color": "emerald", "auto_on_online_paid": True}),
+              ("statuses", {"is_cancel": True}, {"name": "Cancelado", "color": "zinc", "is_cancel": True, "requires_note": True}),
+              ("payment_methods", {"mode": "pluxee"}, {"name": "Pluxee Refeição Online", "mode": "pluxee"})]
+    for kind, query, item in extras:
+        if not await db[kind].find_one(query) and not await db[kind].find_one({"name": item["name"]}):
+            pos = await db[kind].count_documents({})
+            await db[kind].insert_one({**CONFIG_MODELS[kind](**{**item, "position": pos}).model_dump(), "id": new_id()})
     existing = await db.settings.find_one({"id": "store"}, {"_id": 0}) or {}
     merged = {**Settings().model_dump(), **{k: v for k, v in existing.items() if k != "id"}}
     await db.settings.update_one({"id": "store"}, {"$set": merged}, upsert=True)
@@ -405,10 +441,14 @@ async def get_payment_method(name: str) -> dict:
 
 
 async def mark_paid(order_id: str, extra: dict) -> Optional[dict]:
-    res = await db.orders.update_one(
-        {"id": order_id, "payment_status": {"$ne": "Pago"}},
-        {"$set": {"payment_status": "Pago", **extra}},
-    )
+    update = {"payment_status": "Pago", **extra}
+    auto = await db.statuses.find_one({"auto_on_online_paid": True}, {"_id": 0})
+    if auto:
+        update["status"] = auto["name"]
+    res = await db.orders.update_one({"id": order_id, "payment_status": {"$ne": "Pago"}}, {"$set": update})
+    if res.modified_count and auto:
+        await db.orders.update_one({"id": order_id}, {"$push": {"status_history": {
+            "status": auto["name"], "note": "Pagamento online aprovado automaticamente", "at": now_iso()}}})
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if res.modified_count and order:
         try:
@@ -432,7 +472,8 @@ async def list_products():
 @api_router.get("/settings")
 async def public_settings():
     s = await get_settings_doc()
-    return {k: s.get(k, "") for k in PUBLIC_SETTINGS}
+    return {**{k: s.get(k, "") for k in PUBLIC_SETTINGS},
+            "pluxee_ready": bool(s.get("pluxee_enabled")) and pluxee.is_configured(s)}
 
 
 @api_router.get("/config/{kind}")
@@ -464,7 +505,7 @@ async def create_order(data: OrderCreate):
     subtotal, discount, total, coupon = await compute_totals(data.items, data.coupon_code)
     initial = await db.statuses.find_one({"is_initial": True}, {"_id": 0}) or \
         await db.statuses.find_one({}, {"_id": 0}, sort=[("position", 1)])
-    online = pm["mode"] == "online"
+    online = pm["mode"] in ("online", "pluxee")
     order = Order(
         **data.model_dump(exclude={"origin_url"}), order_code=f"ENC-{random.randint(1000, 9999)}",
         subtotal=subtotal, discount=discount, total=total,
@@ -475,7 +516,11 @@ async def create_order(data: OrderCreate):
     if not pm.get("allows_change"):
         order.change_for = None
     doc = order.model_dump()
-    if online:
+    if pm["mode"] == "pluxee":
+        s_doc = await get_settings_doc()
+        if not (s_doc.get("pluxee_enabled") and pluxee.is_configured(s_doc)):
+            raise HTTPException(status_code=400, detail="Pluxee online indisponível")
+    if pm["mode"] == "online":
         if not data.origin_url:
             raise HTTPException(status_code=400, detail="origin_url obrigatório para pagamento online")
         settings = await get_settings_doc()
@@ -537,6 +582,32 @@ async def infinitepay_webhook(request: Request, background: BackgroundTasks):
 
     background.add_task(process)
     return {"ok": True}
+
+
+@api_router.post("/payments/pluxee/pay")
+async def pluxee_pay(data: PluxeePay):
+    order = await db.orders.find_one({"id": data.order_id}, {"_id": 0})
+    if not order or order.get("payment_mode") != "pluxee":
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    if order.get("payment_status") == "Pago":
+        return order
+    cfg = await get_settings_doc()
+    if not (cfg.get("pluxee_enabled") and pluxee.is_configured(cfg)):
+        raise HTTPException(status_code=400, detail="Pluxee online indisponível")
+    digits = lambda v: "".join(c for c in v if c.isdigit())
+    year = digits(data.expiry_year)
+    try:
+        tx = await pluxee.pay(cfg, amount=order["total"], order_number=str(int(datetime.now(timezone.utc).timestamp() * 1000)),
+                              card_number=digits(data.card_number), owner_name=data.owner_name.strip().upper(),
+                              expiry_month=digits(data.expiry_month).zfill(2), expiry_year=year if len(year) == 4 else f"20{year}",
+                              cvv=digits(data.cvv), cpf=digits(data.cpf))
+    except pluxee.PluxeeError as e:
+        raise HTTPException(status_code=402, detail=f"Pagamento Pluxee recusado: {e}")
+    except Exception as e:
+        logger.error(f"Pluxee error: {e}")
+        raise HTTPException(status_code=502, detail="Não foi possível falar com o Pluxee. Tente novamente.")
+    return await mark_paid(data.order_id, {"pluxee_transaction_id": tx.get("transactionId"),
+                                           "transaction_nsu": tx.get("authorizationCode")})
 
 
 # ---------- Admin auth ----------
@@ -695,13 +766,109 @@ async def update_order_status(order_id: str, data: StatusUpdate, _=Admin):
     status = await db.statuses.find_one({"name": data.status}, {"_id": 0})
     if not status:
         raise HTTPException(status_code=400, detail="Status inválido")
-    update = {"status": data.status}
-    if status.get("marks_paid"):
+    note = data.note.strip()
+    if status.get("requires_note") and not note:
+        raise HTTPException(status_code=400, detail="Informe a justificativa deste status")
+    update = {"status": data.status, "status_note": note}
+    paid_online = existing.get("payment_status") == "Pago" and existing.get("payment_mode") in ("online", "pluxee")
+    if status.get("is_cancel") and paid_online:
+        if existing["payment_mode"] == "pluxee" and existing.get("pluxee_transaction_id"):
+            try:
+                await pluxee.cancel(await get_settings_doc(), existing["pluxee_transaction_id"], existing["total"])
+            except Exception as e:
+                raise HTTPException(status_code=502, detail=f"Estorno Pluxee falhou: {e}")
+            update["payment_status"] = "Estornado"
+        else:
+            update["payment_status"] = "Estorno pendente"
+    elif status.get("marks_paid"):
         update["payment_status"] = "Pago"
     elif status.get("sends_charge") and existing.get("payment_status") != "Pago":
         update["payment_status"] = "Aguardando Pagamento"
-    await db.orders.update_one({"id": order_id}, {"$set": update})
-    return {**existing, **update}
+    entry = {"status": data.status, "note": note, "at": now_iso()}
+    await db.orders.update_one({"id": order_id}, {"$set": update, "$push": {"status_history": entry}})
+    return {**existing, **update, "status_history": [*existing.get("status_history", []), entry]}
+
+
+@api_router.patch("/orders/{order_id}/refunded", response_model=Order)
+async def mark_refunded(order_id: str, _=Admin):
+    existing = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    entry = {"status": existing["status"], "note": "Estorno realizado", "at": now_iso()}
+    await db.orders.update_one({"id": order_id}, {"$set": {"payment_status": "Estornado"}, "$push": {"status_history": entry}})
+    return {**existing, "payment_status": "Estornado", "status_history": [*existing.get("status_history", []), entry]}
+
+
+# ---------- Admin: integrations ----------
+SECRET_FIELDS = ["pluxee_client_secret", "pluxee_sub_key_cards", "pluxee_sub_key_transaction"]
+
+
+def _mask(v: str) -> str:
+    return f"••••{v[-4:]}" if v else ""
+
+
+@api_router.get("/admin/integrations")
+async def get_integrations(_=Admin):
+    s = await get_settings_doc()
+    out = {k: s.get(k) for k in ["infinitepay_handle", "infinitepay_last_test", "pluxee_enabled", "pluxee_env",
+                                 "pluxee_client_id", "pluxee_mid", "pluxee_last_test"]}
+    out["pluxee_env"] = out["pluxee_env"] or "uat"
+    out["pluxee_enabled"] = bool(out["pluxee_enabled"])
+    for k in SECRET_FIELDS:
+        out[k] = _mask(s.get(k, ""))
+    out["pluxee_configured"] = pluxee.is_configured(s)
+    return out
+
+
+@api_router.put("/admin/integrations")
+async def update_integrations(data: IntegrationsUpdate, _=Admin):
+    update = {}
+    for k, v in data.model_dump().items():
+        if v is None:
+            continue
+        if isinstance(v, str):
+            v = v.strip()
+            if k in SECRET_FIELDS and (not v or v.startswith("••••")):
+                continue
+        update[k] = v
+    if "infinitepay_handle" in update:
+        update["infinitepay_handle"] = update["infinitepay_handle"].lstrip("$")
+    if update.get("pluxee_env") and update["pluxee_env"] not in pluxee.ENVS:
+        raise HTTPException(status_code=400, detail="Ambiente inválido")
+    await db.settings.update_one({"id": "store"}, {"$set": update})
+    return await get_integrations(True)
+
+
+@api_router.post("/admin/integrations/infinitepay/test")
+async def test_infinitepay(request: Request, _=Admin):
+    s = await get_settings_doc()
+    origin = request.headers.get("origin") or "https://example.com"
+    sample = {"id": f"teste-{new_id()}", "order_code": "TESTE", "customer_name": "Teste", "customer_phone": "41999999999",
+              "discount": 0, "total": 1.0, "items": [{"quantity": 1, "price": 1.0, "name": "Teste de integração", "flavor": None}]}
+    try:
+        url = await infinitepay.create_link(s.get("infinitepay_handle", ""), sample, origin)
+        result = {"ok": url.startswith("https://checkout.infinitepay.io/"), "message": "Link de pagamento gerado com sucesso", "url": url}
+    except Exception as e:
+        result = {"ok": False, "message": f"Falha: verifique a InfiniteTag ({e.__class__.__name__})"}
+    result["at"] = now_iso()
+    await db.settings.update_one({"id": "store"}, {"$set": {"infinitepay_last_test": result}})
+    return result
+
+
+@api_router.post("/admin/integrations/pluxee/test")
+async def test_pluxee(_=Admin):
+    s = await get_settings_doc()
+    if not pluxee.is_configured(s):
+        result = {"ok": False, "message": "Preencha todas as credenciais antes de testar"}
+    else:
+        try:
+            await pluxee.test_connection(s)
+            result = {"ok": True, "message": f"Autenticação OK no ambiente {s['pluxee_env'].upper()}"}
+        except Exception as e:
+            result = {"ok": False, "message": str(e) or "Falha na conexão"}
+    result["at"] = now_iso()
+    await db.settings.update_one({"id": "store"}, {"$set": {"pluxee_last_test": result}})
+    return result
 
 
 @api_router.patch("/orders/{order_id}/payment", response_model=Order)

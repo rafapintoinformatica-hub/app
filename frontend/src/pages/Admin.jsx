@@ -56,12 +56,15 @@ import {
   adminMe,
   getAdminSettings,
   deleteOrder,
+  markRefunded,
 } from "@/lib/api";
 import { useStore } from "@/context/StoreContext";
 import { STATUS_COLORS, chargeMessage, statusMessage } from "@/lib/messages";
 import { ConfigListEditor } from "@/components/admin/ConfigListEditor";
 import { StoreSettingsForm } from "@/components/admin/StoreSettingsForm";
 import { NotificationsPanel, PasswordForm } from "@/components/admin/NotificationsPanel";
+import { IntegrationsPanel } from "@/components/admin/IntegrationsPanel";
+import { StatusChangeDialog, RefundDialog } from "@/components/admin/StatusDialogs";
 import { toast } from "sonner";
 
 const emptyForm = {
@@ -219,16 +222,33 @@ export default function Admin() {
     }
   };
 
-  const changeStatus = async (id, status) => {
-    const order = orders.find((o) => o.id === id);
-    if (statusOf(status)?.sends_charge && order.payment_status !== "Pago")
-      window.open(waUrl(order.customer_phone, chargeMessage(order, settings.pix_key, storeName)), "_blank");
+  const [pendingStatus, setPendingStatus] = useState(null);
+  const [refundOrder, setRefundOrder] = useState(null);
+  const replaceOrder = (u) => setOrders((prev) => prev.map((o) => (o.id === u.id ? u : o)));
+
+  const changeStatus = async (order, status, note) => {
+    const win = status.sends_charge && order.payment_status !== "Pago"
+      ? window.open(waUrl(order.customer_phone, chargeMessage(order, settings.pix_key, storeName)), "_blank") : null;
     try {
-      const updated = await updateOrderStatus(id, status);
-      setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
+      const updated = await updateOrderStatus(order.id, status.name, note);
+      replaceOrder(updated);
+      setPendingStatus(null);
       toast.success("Status atualizado");
+      if (updated.payment_status === "Estorno pendente") setRefundOrder(updated);
+      if (updated.payment_status === "Estornado" && order.payment_status !== "Estornado") toast.success("Estorno realizado no Pluxee");
+    } catch (e) {
+      if (win) win.close();
+      toast.error(e?.response?.data?.detail || "Erro ao atualizar status");
+    }
+  };
+
+  const confirmRefund = async (order) => {
+    try {
+      replaceOrder(await markRefunded(order.id));
+      setRefundOrder(null);
+      toast.success("Estorno registrado");
     } catch {
-      toast.error("Erro ao atualizar status");
+      toast.error("Erro ao registrar estorno");
     }
   };
 
@@ -333,6 +353,12 @@ export default function Admin() {
                         {o.status}
                       </span>
                     </div>
+                    {o.status_note && <p data-testid={`admin-order-note-${o.order_code}`} className="text-xs text-zinc-500 mt-1 italic">Justificativa: {o.status_note}</p>}
+                    {o.payment_status === "Estorno pendente" && (
+                      <button data-testid={`admin-order-refund-${o.order_code}`} onClick={() => setRefundOrder(o)} className="mt-2 text-xs font-bold text-red-700 bg-red-50 rounded-lg px-2.5 py-1">
+                        Estorno pendente — fazer agora
+                      </button>
+                    )}
 
                     <div className="mt-3 space-y-1.5 text-sm text-zinc-600">
                       <p className="flex items-center gap-2">
@@ -367,7 +393,7 @@ export default function Admin() {
                         {o.receipt_url && <a href={o.receipt_url} target="_blank" rel="noopener noreferrer" className="ml-2 text-[11px] text-primary underline">comprovante</a>}
                         <p className="font-mono font-black text-amber-950">{formatBRL(o.total)}</p>
                       </div>
-                      <Select value={o.status} onValueChange={(v) => changeStatus(o.id, v)}>
+                      <Select value={o.status} onValueChange={(v) => setPendingStatus({ order: o, status: statusOf(v) })}>
                         <SelectTrigger className="w-52" data-testid={`admin-order-status-${o.order_code}`}>
                           <SelectValue />
                         </SelectTrigger>
@@ -454,7 +480,7 @@ export default function Admin() {
           <TabsContent value="settings" className="mt-6">
             <Tabs defaultValue="loja">
               <TabsList className="bg-amber-50 p-1 flex-wrap h-auto">
-                {[["loja", "Loja"], ["statuses", "Status"], ["payment_methods", "Pagamentos"], ["places", "Locais"], ["categories", "Categorias"], ["avisos", "Notificações & Senha"]].map(([v, l]) => (
+                {[["loja", "Loja"], ["statuses", "Status"], ["payment_methods", "Pagamentos"], ["places", "Locais"], ["categories", "Categorias"], ["integracoes", "Integrações"], ["avisos", "Notificações & Senha"]].map(([v, l]) => (
                   <TabsTrigger key={v} value={v} data-testid={`settings-subtab-${v}`} className="data-[state=active]:bg-white">{l}</TabsTrigger>
                 ))}
               </TabsList>
@@ -463,6 +489,7 @@ export default function Admin() {
                 {["statuses", "payment_methods", "places", "categories"].map((k) => (
                   <TabsContent key={k} value={k}><ConfigListEditor kind={k} /></TabsContent>
                 ))}
+                <TabsContent value="integracoes"><IntegrationsPanel /></TabsContent>
                 <TabsContent value="avisos" className="space-y-5"><NotificationsPanel /><PasswordForm /></TabsContent>
               </div>
             </Tabs>
@@ -555,6 +582,10 @@ export default function Admin() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <StatusChangeDialog key={pendingStatus ? `${pendingStatus.order.id}-${pendingStatus.status?.name}` : "none"} pending={pendingStatus?.status ? pendingStatus : null}
+        onCancel={() => setPendingStatus(null)} onConfirm={changeStatus} />
+      <RefundDialog order={refundOrder} onClose={() => setRefundOrder(null)} onRefunded={confirmRefund} />
 
       {/* Product form dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
