@@ -27,7 +27,14 @@ export const StoreProvider = ({ children }) => {
 
 
   const reloadSite = useCallback(async () => {
-    const kinds = ["statuses", "payment_methods", "places", "categories"];
+    const kinds = [
+  "statuses",
+  "payment_methods",
+  "places",
+  "categories",
+  "delivery_dates",
+];
+
     const [s, ...lists] = await Promise.all([getSettings(), ...kinds.map(getConfig)]);
     setSite(s);
     setConfig(Object.fromEntries(kinds.map((k, i) => [k, lists[i]])));
