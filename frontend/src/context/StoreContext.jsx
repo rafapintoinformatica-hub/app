@@ -17,7 +17,14 @@ export const StoreProvider = ({ children }) => {
   const [cart, setCart] = useState(() => load("lanche_cart", []).filter((i) => i.key));
   const [deliveryDate, setDeliveryDate] = useState(() => load("lanche_date", null));
   const [site, setSite] = useState(null);
-  const [config, setConfig] = useState({ statuses: [], payment_methods: [], places: [], categories: [] });
+  const [config, setConfig] = useState({
+  statuses: [],
+  payment_methods: [],
+  places: [],
+  categories: [],
+  delivery_dates: [],
+});
+
 
   const reloadSite = useCallback(async () => {
     const kinds = ["statuses", "payment_methods", "places", "categories"];
