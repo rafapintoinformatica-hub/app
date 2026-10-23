@@ -32,7 +32,6 @@ export const StoreProvider = ({ children }) => {
   "payment_methods",
   "places",
   "categories",
-  "delivery_dates"
 ];
 
     const [s, ...lists] = await Promise.all([getSettings(), ...kinds.map(getConfig)]);
