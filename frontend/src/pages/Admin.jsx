@@ -480,7 +480,7 @@ export default function Admin() {
           <TabsContent value="settings" className="mt-6">
             <Tabs defaultValue="loja">
               <TabsList className="bg-amber-50 p-1 flex-wrap h-auto">
-                {[["loja", "Loja"], ["statuses", "Status"], ["payment_methods", "Pagamentos"], ["places", "Locais"], ["categories", "Categorias"], ["integracoes", "Integrações"], ["avisos", "Notificações & Senha"]].map(([v, l]) => (
+                {[["loja", "Loja"], ["statuses", "Status"], ["payment_methods", "Pagamentos"], ["places", "Locais"], ["categories", "Categorias"], ["integracoes", "Integrações"], ["avisos", "Notificações & Senha"], ["delivery_dates", "Agenda"]] .map(([v, l]) => (
                   <TabsTrigger key={v} value={v} data-testid={`settings-subtab-${v}`} className="data-[state=active]:bg-white">{l}</TabsTrigger>
                 ))}
               </TabsList>
