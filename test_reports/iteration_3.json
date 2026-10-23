@@ -1,0 +1,39 @@
+{
+  "summary": "Tested the new features end to end. Backend: 20 of 21 pytest tests pass. The new file test_places_payment.py covers Amil/Green Park orders with complement, change_for persistence, and PATCH /api/orders/{id}/payment: it saves, a GET confirms it, it returns 404 for an unknown id and 422 when payment_method is missing. The one failure: the endpoint accepts any payment_method, e.g. 'Bitcoin'. Frontend: checkout step 1 works. The place buttons show the right labels (Setor/Intervalo disponível for Amil, Bloco/Apartamento for Green Park). Continuar stays disabled until name, phone, place and both details are filled, and whitespace-only details don't count. Switching place clears the details. The calendar is in pt-BR. All 5 payment options are shown. Dinheiro shows the change box and switch. A change amount below the total (50 < 65,80) shows the error toast and blocks submit. '100,00' is accepted and saved as change_for=100. The WhatsApp link goes to wa.me/5541989023769 and includes 'Local de entrega: Green Park - Bloco: Bloco 4 · Apartamento: 302' and 'Dinheiro (troco para R$ 100,00)'. Admin: the order card shows the place and details. The payment editor (select, change input only for Dinheiro, save) works, and the change survives a page reload. In Relatórios the totals and the per-payment and per-day tables are correct. The from/to date filter works. The per-payment table updates after a payment edit. Regression: setting 'Entregue - Aguardando Pagamento' opens wa.me/55<customer phone> with the charge message. Settings are intact.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/orders/{id}/payment", "issue": "No validation of payment_method. Any string (e.g. 'Bitcoin') is accepted and then shows up as its own row in Relatórios. change_for is not checked against the total, and it is not forced to null for methods other than Dinheiro."},
+      {"endpoint": "POST /api/orders", "issue": "address/complement are not checked against Amil/Green Park, and change_for is not checked (it can be lower than the total, or sent with a non-cash method). The client-side price trust from iteration_2 is still there."},
+      {"endpoint": "Admin endpoints", "issue": "Still no server-side admin auth (carried over from iteration_2). PATCH payment and GET orders are public."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AdminReports", "issue": "The from/to date filter resets when switching tabs, because the component unmounts.", "selector": "[data-testid='reports-from-input']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Relatórios", "issues": ["The date filters use native <input type=date>, shown as mm/dd/yyyy (US format) in a Portuguese app. Use a shadcn Calendar/Popover with ptBR.", "Totals include every order whatever its status. Consider separating paid from pending ('Pago' vs 'A pagar')."]},
+      {"screen": "Admin charge WhatsApp message", "issue_note": "", "issues": ["The charge message for Dinheiro orders doesn't mention the change amount (troco). This would be helpful for the delivery person."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_places_payment.py", "/app/backend/tests/test_cucas_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Validate payment_method in PaymentUpdate/OrderInput against the allowed list (Pix, Cartão de Crédito, Cartão de Débito, Pluxee Refeição, Dinheiro). Set change_for to null unless the method is Dinheiro. Optionally require change_for >= total.",
+    "OrderPaymentEditor: validate that the change amount is >= the order total, as checkout does",
+    "(Optional) Replace the native date inputs in Relatórios with shadcn Calendar (ptBR); keep the filter state when switching tabs"
+  ],
+  "critical_code_review_comments": [
+    "OrderPaymentEditor initializes method/change from props only once. After Cancel, reopening shows the previously chosen but unsaved value. Reset the state on cancel.",
+    "Admin.jsx is 640 lines; consider splitting it into tab components",
+    "delivery_date still uses date.toISOString(), which shifts by a day in UTC+ timezones. Use date-fns format(date,'yyyy-MM-dd') instead.",
+    "Reports are computed on the client from GET /api/orders (the limit is 1000). This won't scale; consider a backend aggregation endpoint."
+  ],
+  "updated_files": ["/app/backend/tests/test_places_payment.py"],
+  "success_rate": {"backend": "95% (20/21; the failure is missing payment_method validation)", "frontend": "100%"},
+  "seed_data_creation": "Deleted all TEST_* orders (18) from Mongo directly. 1 non-test order remains. Settings were verified unchanged: store_whatsapp=5541989023769, pix_key=''.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=<url> pytest /app/backend/tests. Product slug ids such as cuca-de-banana-com-farofa-doce; flavor option snack-flavor-option-<id>-banana. Calendar days are found with button[name='day']:not([disabled]) inside checkout-delivery-date-calendar. Select options in admin are found with get_by_role('option', name=..., exact=True). Capture window.open with page.add_script_tag after login. There is no order delete endpoint; clean up TEST_ orders via Mongo."
+}

@@ -50,31 +50,25 @@ import {
   createCoupon,
   deleteCoupon,
   formatBRL,
-  getSettings,
-  updateSettings,
   waUrl,
+  getToken,
+  setToken,
+  adminMe,
+  getAdminSettings,
+  deleteOrder,
 } from "@/lib/api";
+import { useStore } from "@/context/StoreContext";
+import { STATUS_COLORS, chargeMessage, statusMessage } from "@/lib/messages";
+import { ConfigListEditor } from "@/components/admin/ConfigListEditor";
+import { StoreSettingsForm } from "@/components/admin/StoreSettingsForm";
+import { NotificationsPanel, PasswordForm } from "@/components/admin/NotificationsPanel";
 import { toast } from "sonner";
-
-const CATEGORIES = ["Cucas", "Bolos Caseiros", "Bolos Recheados", "Tortas Doces", "Bebidas"];
-const AWAITING = "Entregue - Aguardando Pagamento";
-
-const STATUSES = ["Pendente", "Em Preparo", "Pronto", "Em Rota", "Entregue e Pago", AWAITING];
-const STATUS_COLOR = {
-  Pendente: "bg-amber-100 text-amber-800",
-  "Em Preparo": "bg-blue-100 text-blue-800",
-  Pronto: "bg-purple-100 text-purple-800",
-  "Em Rota": "bg-orange-100 text-orange-800",
-  Entregue: "bg-emerald-100 text-emerald-800",
-  "Entregue e Pago": "bg-emerald-100 text-emerald-800",
-  [AWAITING]: "bg-red-100 text-red-800",
-};
 
 const emptyForm = {
   name: "",
   description: "",
   price: "",
-  category: CATEGORIES[0],
+  category: "",
   image_url: "",
   badge: "",
   lead_time_days: 1,
@@ -91,37 +85,26 @@ const emptyCoupon = {
   active: true,
 };
 
-const STATUS_MESSAGES = {
-  Pendente: "recebemos seu pedido e ele está confirmado",
-  "Em Preparo": "seu pedido já está sendo preparado com carinho",
-  Pronto: "seu pedido está pronto",
-  "Em Rota": "seu pedido saiu para entrega",
-  Entregue: "seu pedido foi entregue. Bom apetite!",
-  "Entregue e Pago": "seu pedido foi entregue e o pagamento confirmado. Obrigado e bom apetite!",
-};
-
-const chargeMessage = (o, pixKey) =>
-  [
-    `Olá ${o.customer_name}! Aqui é da Deliciosas Cucas.`,
-    `Seu pedido #${o.order_code} foi entregue. Segue a cobrança:`,
-    "",
-    ...o.items.map((i) => `• ${i.quantity}x ${i.name}${i.flavor ? ` (${i.flavor})` : ""} - ${formatBRL(i.price * i.quantity)}`),
-    "",
-    `Valor a pagar: ${formatBRL(o.total)} (${o.payment_method})`,
-    pixKey ? `Chave Pix: ${pixKey}` : null,
-    "",
-    "Assim que pagar, envie o comprovante por aqui. Obrigado!",
-  ].filter((l) => l !== null).join("\n");
-
-const waLink = (o, pixKey) => {
-  if (o.status === AWAITING) return waUrl(o.customer_phone, chargeMessage(o, pixKey));
-  const msg = `Olá ${o.customer_name}! Aqui é da Deliciosas Cucas. Sobre seu pedido #${o.order_code} (entrega ${new Date(o.delivery_date + "T00:00:00").toLocaleDateString("pt-BR")}): ${STATUS_MESSAGES[o.status] || "atualização do seu pedido"}.`;
-  return waUrl(o.customer_phone, msg);
-};
-
 export default function Admin() {
   const navigate = useNavigate();
+  const { config, site } = useStore();
+  const storeName = site?.store_name || "";
+  const statusOf = (name) => config.statuses.find((x) => x.name === name);
   const [authed, setAuthed] = useState(false);
+
+  useEffect(() => {
+    if (getToken()) adminMe().then(() => setAuthed(true)).catch(() => setToken(null));
+  }, []);
+
+  const logout = () => {
+    setToken(null);
+    setAuthed(false);
+  };
+
+  const waLink = (o) =>
+    statusOf(o.status)?.sends_charge && o.payment_status !== "Pago"
+      ? waUrl(o.customer_phone, chargeMessage(o, settings.pix_key, storeName))
+      : waUrl(o.customer_phone, statusMessage(o, storeName));
   const [password, setPassword] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
 
@@ -136,20 +119,11 @@ export default function Admin() {
   const [couponForm, setCouponForm] = useState(emptyCoupon);
   const [settings, setSettings] = useState({ store_whatsapp: "", pix_key: "" });
 
-  const saveSettings = async () => {
-    try {
-      setSettings(await updateSettings(settings));
-      toast.success("Configurações salvas");
-    } catch {
-      toast.error("Erro ao salvar configurações");
-    }
-  };
-
   const loadData = () => {
     getProducts().then(setProducts);
     getOrders().then(setOrders);
     getCoupons().then(setCoupons);
-    getSettings().then(setSettings);
+    getAdminSettings().then(setSettings);
   };
 
   useEffect(() => {
@@ -172,7 +146,7 @@ export default function Admin() {
 
   const openNew = () => {
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, category: config.categories[0]?.name || "" });
     setDialogOpen(true);
   };
 
@@ -247,7 +221,8 @@ export default function Admin() {
 
   const changeStatus = async (id, status) => {
     const order = orders.find((o) => o.id === id);
-    if (status === AWAITING) window.open(waUrl(order.customer_phone, chargeMessage(order, settings.pix_key)), "_blank");
+    if (statusOf(status)?.sends_charge && order.payment_status !== "Pago")
+      window.open(waUrl(order.customer_phone, chargeMessage(order, settings.pix_key, storeName)), "_blank");
     try {
       const updated = await updateOrderStatus(id, status);
       setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
@@ -310,7 +285,10 @@ export default function Admin() {
             </Button>
             <h1 className="font-heading font-extrabold text-xl text-amber-950">Painel Admin</h1>
           </div>
-          <span className="text-sm text-zinc-500 hidden sm:block">Deliciosas Cucas</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-zinc-500 hidden sm:block">{storeName}</span>
+            <Button data-testid="admin-logout-button" size="sm" variant="outline" onClick={logout}>Sair</Button>
+          </div>
         </div>
       </header>
 
@@ -351,7 +329,7 @@ export default function Admin() {
                         <p className="font-mono font-black text-primary">#{o.order_code}</p>
                         <p className="font-semibold text-amber-950 mt-0.5">{o.customer_name}</p>
                       </div>
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_COLOR[o.status]}`}>
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_COLORS[statusOf(o.status)?.color] || STATUS_COLORS.zinc}`}>
                         {o.status}
                       </span>
                     </div>
@@ -383,6 +361,10 @@ export default function Admin() {
                     <div className="flex items-center justify-between mt-4">
                       <div>
                         <OrderPaymentEditor order={o} onUpdated={(u) => setOrders((prev) => prev.map((x) => (x.id === u.id ? u : x)))} />
+                        <span data-testid={`admin-order-paystatus-${o.order_code}`} className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-full mt-1 ${o.payment_status === "Pago" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-700"}`}>
+                          {o.payment_status}
+                        </span>
+                        {o.receipt_url && <a href={o.receipt_url} target="_blank" rel="noopener noreferrer" className="ml-2 text-[11px] text-primary underline">comprovante</a>}
                         <p className="font-mono font-black text-amber-950">{formatBRL(o.total)}</p>
                       </div>
                       <Select value={o.status} onValueChange={(v) => changeStatus(o.id, v)}>
@@ -390,20 +372,20 @@ export default function Admin() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {STATUSES.map((s) => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          {config.statuses.map((s) => (
+                            <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <a
                       data-testid={`admin-whatsapp-${o.order_code}`}
-                      href={waLink(o, settings.pix_key)}
+                      href={waLink(o)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="mt-3 flex items-center justify-center gap-2 w-full rounded-lg bg-[#25D366] hover:bg-[#1da851] text-white font-semibold text-sm py-2 transition-colors"
                     >
-                      <MessageCircle className="h-4 w-4" /> {o.status === AWAITING ? "Enviar cobrança no WhatsApp" : "Avisar cliente no WhatsApp"}
+                      <MessageCircle className="h-4 w-4" /> {statusOf(o.status)?.sends_charge && o.payment_status !== "Pago" ? "Enviar cobrança no WhatsApp" : "Avisar cliente no WhatsApp"}
                     </a>
                   </div>
                 ))}
@@ -470,20 +452,20 @@ export default function Admin() {
           </TabsContent>
 
           <TabsContent value="settings" className="mt-6">
-            <div className="max-w-md bg-white rounded-2xl border border-amber-200/60 p-5 shadow-sm space-y-4">
-              <h3 className="font-heading font-bold text-amber-950">WhatsApp & Pix</h3>
-              <div className="space-y-1.5">
-                <Label>WhatsApp da loja (recebe os pedidos)</Label>
-                <Input data-testid="settings-whatsapp-input" value={settings.store_whatsapp} onChange={(e) => setSettings({ ...settings, store_whatsapp: e.target.value })} placeholder="5541999999999" />
+            <Tabs defaultValue="loja">
+              <TabsList className="bg-amber-50 p-1 flex-wrap h-auto">
+                {[["loja", "Loja"], ["statuses", "Status"], ["payment_methods", "Pagamentos"], ["places", "Locais"], ["categories", "Categorias"], ["avisos", "Notificações & Senha"]].map(([v, l]) => (
+                  <TabsTrigger key={v} value={v} data-testid={`settings-subtab-${v}`} className="data-[state=active]:bg-white">{l}</TabsTrigger>
+                ))}
+              </TabsList>
+              <div className="mt-5 max-w-2xl">
+                <TabsContent value="loja"><StoreSettingsForm onSaved={setSettings} /></TabsContent>
+                {["statuses", "payment_methods", "places", "categories"].map((k) => (
+                  <TabsContent key={k} value={k}><ConfigListEditor kind={k} /></TabsContent>
+                ))}
+                <TabsContent value="avisos" className="space-y-5"><NotificationsPanel /><PasswordForm /></TabsContent>
               </div>
-              <div className="space-y-1.5">
-                <Label>Chave Pix (enviada nas cobranças)</Label>
-                <Input data-testid="settings-pix-input" value={settings.pix_key} onChange={(e) => setSettings({ ...settings, pix_key: e.target.value })} placeholder="CPF, e-mail, telefone ou chave aleatória" />
-              </div>
-              <Button data-testid="settings-save-button" onClick={saveSettings} className="w-full rounded-lg bg-primary hover:bg-[#C04917] text-white">
-                Salvar
-              </Button>
-            </div>
+            </Tabs>
           </TabsContent>
 
           <TabsContent value="coupons" className="mt-6">
@@ -606,7 +588,7 @@ export default function Admin() {
               <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
                 <SelectTrigger data-testid="admin-form-category"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {config.categories.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

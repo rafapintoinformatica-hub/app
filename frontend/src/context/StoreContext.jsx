@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { getConfig, getSettings } from "@/lib/api";
 
 const StoreContext = createContext(null);
 export const useStore = () => useContext(StoreContext);
@@ -15,6 +16,23 @@ const load = (key, fallback) => {
 export const StoreProvider = ({ children }) => {
   const [cart, setCart] = useState(() => load("lanche_cart", []).filter((i) => i.key));
   const [deliveryDate, setDeliveryDate] = useState(() => load("lanche_date", null));
+  const [site, setSite] = useState(null);
+  const [config, setConfig] = useState({ statuses: [], payment_methods: [], places: [], categories: [] });
+
+  const reloadSite = useCallback(async () => {
+    const kinds = ["statuses", "payment_methods", "places", "categories"];
+    const [s, ...lists] = await Promise.all([getSettings(), ...kinds.map(getConfig)]);
+    setSite(s);
+    setConfig(Object.fromEntries(kinds.map((k, i) => [k, lists[i]])));
+  }, []);
+
+  useEffect(() => {
+    reloadSite();
+  }, [reloadSite]);
+
+  useEffect(() => {
+    if (site?.store_name) document.title = `${site.store_name} — ${site.store_tagline}`;
+  }, [site]);
 
   useEffect(() => {
     localStorage.setItem("lanche_cart", JSON.stringify(cart));
@@ -61,6 +79,9 @@ export const StoreProvider = ({ children }) => {
         itemCount,
         deliveryDate,
         setDeliveryDate,
+        site,
+        config,
+        reloadSite,
       }}
     >
       {children}

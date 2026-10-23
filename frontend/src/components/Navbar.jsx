@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
 export const Navbar = ({ onCartClick }) => {
-  const { itemCount } = useStore();
+  const { itemCount, site } = useStore();
   const navigate = useNavigate();
 
   return (
@@ -19,9 +19,9 @@ export const Navbar = ({ onCartClick }) => {
             <UtensilsCrossed className="h-5 w-5" />
           </div>
           <div className="text-left leading-tight">
-            <p className="font-heading font-extrabold text-lg text-amber-950">Deliciosas Cucas</p>
+            <p data-testid="nav-store-name" className="font-heading font-extrabold text-lg text-amber-950">{site?.store_name}</p>
             <p className="text-[11px] uppercase tracking-widest text-amber-700/70 font-semibold -mt-0.5">
-              Cucas & Bolos
+              {site?.store_tagline}
             </p>
           </div>
         </button>

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatBRL } from "@/lib/api";
-import { PAYMENT_METHODS } from "@/lib/payments";
+import { useStore } from "@/context/StoreContext";
 
 const qtyOf = (o) => o.items.reduce((s, i) => s + i.quantity, 0);
 
@@ -35,6 +35,8 @@ const Table = ({ title, head, rows, testid }) => (
 );
 
 export const AdminReports = ({ orders }) => {
+  const { config } = useStore();
+  const PAYMENT_METHODS = config.payment_methods.map((m) => m.name);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
@@ -61,7 +63,7 @@ export const AdminReports = ({ orders }) => {
     });
     const keys = [...PAYMENT_METHODS, ...Object.keys(m).filter((k) => !PAYMENT_METHODS.includes(k))];
     return keys.filter((k) => m[k]).map((k) => [k, m[k].orders, m[k].qty, formatBRL(m[k].total)]);
-  }, [filtered]);
+  }, [filtered, config.payment_methods]);
 
   const total = filtered.reduce((s, o) => s + o.total, 0);
   const qty = filtered.reduce((s, o) => s + qtyOf(o), 0);
