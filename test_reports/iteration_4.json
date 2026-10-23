@@ -1,0 +1,63 @@
+{
+  "summary": "Iteration 4: tested the new admin JWT auth, the configurable lists (statuses, payment methods, places, categories), online payment through InfinitePay, the payment return page, webhook/confirm, push and email notifications, store settings and password change, plus regression. Backend: 68/69 pytest tests pass (1 skipped). The one failure: POST /api/config/{kind} without 'name' returns 500. Frontend: all requested flows pass. Login stores admin_token and the session survives a reload. 'Sair' logs out. The config editor adds, edits, deletes (window.confirm) and saves every list. Created TEST_Status, TEST_Pagamento, TEST_Local and TEST_Cat; each showed up in its place (status Select, checkout payment, checkout place with its field, category chip). Renaming TEST_Local to TEST_Local2 updated the order card. The status flags work: sends_charge opens api.whatsapp.com/send?phone=5541999990000 with the charge message and sets 'Aguardando Pagamento'; marks_paid sets 'Pago'. Store settings save and show in nav, hero and footer, then restored. Checkout groups 'Pagar agora (online)' and 'Pagar na entrega'. Dinheiro shows the troco box. Pay on delivery opens the WhatsApp popup for 5541989023769 and shows the order confirmation. Online pay ('Ir para pagamento') redirects to https://checkout.infinitepay.io/rafael-gomes-23d?lenc=..., with payment_status 'Aguardando pagamento online'. On /pagamento/retorno: unpaid order shows pending with a working retry button, unknown id shows the error page, fake tx/slug stays pending. Push test returns sent:0. Test email returns 400 when no address is set and 200 with delivered@resend.dev. Password change and revert work in UI and API. Lockout returns 429 after 5 failures (separate X-Forwarded-For). The order card payment editor uses the configured methods. Reports by payment method and by day render. sw.js, manifest.json and icons are served, and the SW registers. All TEST_ data was removed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST/PUT /api/config/{kind}", "issue": "body is typed as a raw dict and parsed with model(**body) inside the handler, so a missing name or wrong field types raise a pydantic ValidationError and return 500 instead of 422. Log: 'ValidationError: 1 validation error for CategoryItem'. Fix: catch ValidationError and raise HTTPException(422), or use a typed body per kind."},
+      {"endpoint": "PUT /api/config/{kind}/{id}", "issue": "Renaming does not check for duplicates, so two items can end up with the same name (POST does check)."},
+      {"endpoint": "DELETE /api/config/{kind}/{id}", "issue": "Items still in use can be deleted: a status used by real orders (the order Select then shows blank), a category used by products, or the initial status. Consider blocking deletion, or warning and showing the usage count."},
+      {"endpoint": "POST /api/admin/login", "issue": "After the 15-minute lockout ends, count stays >= 5, so one more wrong password locks the IP again right away. Reset count when 'until' has passed."},
+      {"endpoint": "PUT /api/admin/settings", "issue": "Uses the full Settings model with defaults. A partial PUT silently resets missing fields (pix_key, notification_email, etc.) to their defaults. The frontend sends the full object, so it works today, but it is fragile. Use exclude_unset or a model with optional fields."},
+      {"endpoint": "POST /api/infinitepay/webhook", "issue": "A non-JSON body raises in request.json() and returns 500 (should return 400)."},
+      {"endpoint": "POST /api/orders (online)", "issue": "Abandoned online orders stay 'Aguardando pagamento online' forever. They appear in the admin list and are counted in Relatórios totals (the test order ENC-3304 was counted). Consider excluding unpaid online orders from reports or adding an expiry."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "InfinitePay checkout prefill", "issue": "On the InfinitePay page the customer name shows as 'TESTUI Online' (InfinitePay strips the '_'). The phone field was empty even though phone_number '+5541999990000' was sent. Worth checking InfinitePay's expected phone format so the field is prefilled.", "affected_selectors": []},
+      {"flow": "Push enable in headless browser", "issue": "Could not verify a real subscription: notification permission is denied in headless Chromium. sw.js registers fine. A real device test is still needed.", "affected_selectors": ["[data-testid='push-enable-button']"]}
+    ],
+    "design_issues": [
+      {"screen": "Store hero", "issues": ["The '+80 pedidos / entregues esta semana' badge and the hero chips ('Você escolhe o dia da entrega', 'Pague online ou na entrega') plus 'Nosso Cardápio / Escolha e agende sua encomenda' are hardcoded in Store.jsx and cannot be edited in Configurações. The request said 'everything on the site editable'."]},
+      {"screen": "Admin Relatórios / Cupons", "issues": ["Still uses native <input type=date> (reports-from-input, reports-to-input, coupon-form-validuntil) instead of the shadcn Calendar used in checkout."]},
+      {"screen": "Admin Status list (mobile 390px)", "issues": ["The long status pill 'Entregue - Aguardando Pagamento' wraps into two lines with a broken pill background. Minor."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration4_features.py",
+    "/app/backend/tests/test_cucas_api.py",
+    "/app/backend/tests/test_places_payment.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results_iter4.xml"
+  ],
+  "action_items": [
+    "Return 422 instead of 500 for invalid bodies on POST/PUT /api/config/{kind} (catch pydantic ValidationError).",
+    "Check for duplicate names when renaming in PUT /api/config/{kind}/{id}.",
+    "Guard deletion of statuses, categories and payment methods still in use (at least warn in the UI), and never allow deleting the only is_initial status without reassigning it.",
+    "Reset the login_attempts count after the lockout window expires.",
+    "Make PUT /api/admin/settings partial-safe (exclude_unset merge).",
+    "Optional: make the remaining hardcoded store texts editable in settings ('+80 pedidos' badge, hero chips, catalog title and subtitle).",
+    "Optional: exclude 'Aguardando pagamento online' orders from Relatórios totals, or mark them as abandoned."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 777 lines, over the 700 guideline. Split it into routers (orders, config, admin, payments).",
+    "create_config/update_config take `body: dict`, which bypasses FastAPI validation and gives 500s plus no OpenAPI schema.",
+    "/api/orders/{id}/public returns the full order (phone, address, items) to anyone who has the UUID. This is acceptable since UUIDs are unguessable, but consider trimming the fields returned.",
+    "/api/payments/infinitepay/confirm is public and calls InfinitePay on every request. Fine (it is verified server-side), but consider rate limiting.",
+    "The frontend has no 401 response interceptor. Admin.jsx only validates the token on mount (adminMe), so if the token expires mid-session, later calls just fail with toasts and nothing forces logout."
+  ],
+  "updated_files": [
+    "/app/backend/tests/conftest.py (new: admin token fixture + TEST_ cleanup)",
+    "/app/backend/tests/test_iteration4_features.py (new)",
+    "/app/backend/tests/test_cucas_api.py (uses Bearer token, /api/admin/settings with full payload restore, place Amil, product-count assertion relaxed to the owner's real catalog, bad-login uses a distinct X-Forwarded-For)",
+    "/app/backend/tests/test_places_payment.py (uses the shared authenticated fixture)"
+  ],
+  "success_rate": {"backend": "98.5% (68/69, 1 skipped)", "frontend": "100% of requested flows"},
+  "seed_data_creation": "None kept. During tests, TEST_ orders, products, coupons and config items were created, then deleted by the conftest teardown and the UI delete flow. ENC-7711 and ENC-3304 (TEST_UI) were removed. The final DB has only the real data: 8 orders, including a new real 'Rafael' Pix Online order ENC-8726 created by the owner at 06:10 during testing; 1 product; 2 coupons; 6 statuses; 7 payment methods; 2 places; 5 categories. The admin password is still lanche123.",
+  "test_credentials": "Admin password lanche123 (/app/memory/test_credentials.md). The lockout test uses a random X-Forwarded-For 10.251.x.x.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The DB is live with real owner data, and the owner is actively using it. During this run they set pix_key and notification_email to deliciosascucas@gmail.com and created a real Pix Online order. Never reseed or modify non-TEST_ data. test_email_flow now skips when notification_email is non-empty so it does not touch the owner's config. pytest.ini adds xdist (-n auto). Run with `-n 0`, because the password-change and settings-restore tests are not parallel-safe. Product card testids use slug(name), e.g. snack-*-cuca. Checkout place testid: checkout-place-{lowercased name with spaces->-}. Payment testid: checkout-payment-{slug}. In Python Playwright dialog handlers you must `import asyncio`.",
+  "rca of the issue": "Config 500: server.py create_config/update_config do `model(**body)` on a raw dict. pydantic.ValidationError is not converted to a 422 by FastAPI when raised inside the handler, so it surfaces as a 500. Reproduce: POST /api/config/categories with body {} and an admin Bearer token. Fix: `try: item = model(**body) except ValidationError as e: raise HTTPException(422, e.errors())`."
+}

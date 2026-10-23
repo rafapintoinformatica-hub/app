@@ -12,7 +12,7 @@ import logging
 import random
 import bcrypt
 import jwt
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -239,6 +239,20 @@ CONFIG_MODELS = {
     "places": PlaceItem,
     "categories": CategoryItem,
 }
+
+
+def parse_config(kind: str, body: dict) -> dict:
+    model = CONFIG_MODELS.get(kind)
+    if not model:
+        raise HTTPException(status_code=404, detail="Tipo inválido")
+    try:
+        item = model(**body).model_dump()
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors(include_url=False, include_context=False))
+    if not item["name"].strip():
+        raise HTTPException(status_code=422, detail="Informe o nome")
+    item["name"] = item["name"].strip()
+    return item
 
 DEFAULT_CONFIG = {
     "statuses": [
@@ -576,10 +590,7 @@ async def update_settings(data: Settings, _=Admin):
 
 @api_router.post("/config/{kind}")
 async def create_config(kind: str, body: dict, _=Admin):
-    model = CONFIG_MODELS.get(kind)
-    if not model:
-        raise HTTPException(status_code=404, detail="Tipo inválido")
-    item = model(**body).model_dump()
+    item = parse_config(kind, body)
     if await db[kind].find_one({"name": item["name"]}):
         raise HTTPException(status_code=400, detail="Já existe um item com esse nome")
     if kind == "statuses" and item["is_initial"]:
@@ -592,13 +603,10 @@ async def create_config(kind: str, body: dict, _=Admin):
 
 @api_router.put("/config/{kind}/{item_id}")
 async def update_config(kind: str, item_id: str, body: dict, _=Admin):
-    model = CONFIG_MODELS.get(kind)
-    if not model:
-        raise HTTPException(status_code=404, detail="Tipo inválido")
+    item = parse_config(kind, body)
     existing = await db[kind].find_one({"id": item_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Item não encontrado")
-    item = model(**body).model_dump()
     if kind == "statuses" and item["is_initial"]:
         await db.statuses.update_many({"id": {"$ne": item_id}}, {"$set": {"is_initial": False}})
     await db[kind].update_one({"id": item_id}, {"$set": item})

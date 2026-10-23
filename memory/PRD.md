@@ -16,3 +16,14 @@ FastAPI + MongoDB (backend/server.py), React (frontend/src). Admin password via 
 ## Backlog
 - P1: Usuário cadastrar chave Pix em Configurações
 - P2: Envio automático via WhatsApp API (Twilio), relatório financeiro de valores a receber
+
+## Update (Jun/2026 — iteration_4: 98.5% backend, 100% frontend)
+- Online payment: InfinitePay checkout (Pix + cartão), handle in settings (rafael-gomes-23d). Webhook /api/infinitepay/webhook + return page /pagamento/retorno (confirm via payment_check)
+- Configurable in Admin → Configurações: Loja (name, texts, hero image, footer, WhatsApp, Pix, InfiniteTag, notification e-mail), Status (flags: inicial, marca pago, envia cobrança), Formas de pagamento (entrega/online, troco, ativo), Locais (custom fields), Categorias, Notificações & Senha
+- Admin auth: bcrypt + JWT bearer (7 days); brute-force lockout
+- Payment approved -> e-mail (Emergent managed email) + Web Push (VAPID, /sw.js, manifest PWA)
+- Pluxee online: PENDING — user will request credentials from Pluxee (3003-5083); API M-PAL (OAuth2)
+- Files: backend/notify.py, backend/infinitepay.py, frontend/src/components/admin/*, components/checkout/*, pages/PaymentReturn.jsx, lib/messages.js
+## Backlog
+- P0: Pluxee online when credentials arrive
+- P2: order list filters by status/place; production agenda per day

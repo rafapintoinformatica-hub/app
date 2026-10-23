@@ -6,11 +6,6 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 
 
-@pytest.fixture(scope="module")
-def s():
-    x = requests.Session()
-    x.headers.update({"Content-Type": "application/json"})
-    return x
 
 
 def payload(**kw):
