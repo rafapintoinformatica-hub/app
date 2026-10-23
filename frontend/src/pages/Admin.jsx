@@ -461,14 +461,7 @@ export default function Admin() {
                         onClick={() => removeProduct(p.id)}
                         size="sm"
                         variant="outline"
-                        {["loja", "Loja"],
-  ["statuses", "Status"],
-  ["payment_methods", "Pagamentos"],
-  ["places", "Locais"],
-  ["categories", "Categorias"],
-  ["integracoes", "Integrações"],
-  ["avisos", "Notificações & Senha"],
-].map(([v, l]) => (
+                        
 
                   <TabsTrigger key={v} value={v} data-testid={`settings-subtab-${v}`} className="data-[state=active]:bg-white">{l}</TabsTrigger>
                 ))}
