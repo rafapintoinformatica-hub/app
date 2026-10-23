@@ -46,6 +46,31 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(0, 0, 0, 0);
+const enabledDates = config.delivery_dates || [];
+
+const formatDateKey = (date) => {
+  return `${date.getFullYear()}-${String(
+    date.getMonth() + 1
+  ).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+};
+
+const isDateEnabled = (date) => {
+  const dateString = formatDateKey(date);
+
+  return enabledDates.some((d) => {
+    if (typeof d === "string") {
+      return d === dateString;
+    }
+
+    return d.date === dateString && d.active !== false;
+  });
+};
+
+  
+
+  
 
   const validStep1 =
     form.customer_name.trim() && form.customer_phone.trim() && place && place.fields.every((_, i) => (form.details[i] || "").trim());
@@ -144,7 +169,12 @@ export const CheckoutDialog = ({ open, onOpenChange }) => {
                   <h3 className="font-heading font-bold text-amber-950 flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> 2. Dia da Entrega</h3>
                   <p className="text-xs text-amber-800 bg-amber-50 rounded-lg px-3 py-2">Feito sob encomenda. A entrega começa a partir de amanhã.</p>
                   <div className="flex justify-center bg-white rounded-xl border border-amber-200/60 p-2" data-testid="checkout-delivery-date-calendar">
-                    <Calendar locale={ptBR} mode="single" selected={date} onSelect={setDate} disabled={(d) => d < tomorrow} className="rounded-md" />
+                    <Calendar locale={ptBR} mode="single" selected={date} onSelect={setDate} disabled={(d) => {
+  if (d < tomorrow) return true;
+
+  return !isDateEnabled(d);
+}}
+className="rounded-md" />
                   </div>
                 </div>
               )}
