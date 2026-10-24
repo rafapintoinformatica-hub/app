@@ -456,26 +456,37 @@ export default function Admin() {
                       >
                         <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                       </Button>
-                      
-                        <Button
-  data-testid={`admin-delete-${p.id}`}
-  onClick={() => removeProduct(p.id)}
-  size="sm"
-  variant="outline"
-  className="rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10"
->
-  <Trash2 className="h-3.5 w-3.5" />
-</Button>
+                      <Button
+                        data-testid={`admin-delete-${p.id}`}
+                        onClick={() => removeProduct(p.id)}
+                        size="sm"
+                        variant="outline"
+                        className="rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
 
+          {/* Coupons */}
+          <TabsContent value="reports" className="mt-6">
+            <AdminReports orders={orders} />
+          </TabsContent>
 
+          <TabsContent value="settings" className="mt-6">
+            <Tabs defaultValue="loja">
+              <TabsList className="bg-amber-50 p-1 flex-wrap h-auto">
+                {[["loja", "Loja"], ["statuses", "Status"], ["payment_methods", "Pagamentos"], ["places", "Locais"], ["categories", "Categorias"], ["integracoes", "Integrações"], ["avisos", "Notificações & Senha"]].map(([v, l]) => (
                   <TabsTrigger key={v} value={v} data-testid={`settings-subtab-${v}`} className="data-[state=active]:bg-white">{l}</TabsTrigger>
                 ))}
               </TabsList>
               <div className="mt-5 max-w-2xl">
                 <TabsContent value="loja"><StoreSettingsForm onSaved={setSettings} /></TabsContent>
                 {["statuses", "payment_methods", "places", "categories"].map((k) => (
-
-
                   <TabsContent key={k} value={k}><ConfigListEditor kind={k} /></TabsContent>
                 ))}
                 <TabsContent value="integracoes"><IntegrationsPanel /></TabsContent>
